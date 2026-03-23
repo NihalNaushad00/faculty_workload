@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .dashboard-header h1 {
+        margin: 0 0 10px 0;
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    
+    .dashboard-header p {
+        margin: 0;
+        opacity: 0.95;
+        font-size: 1.1rem;
+    }
+    
+    .dashboard-header .user-info {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 2px solid rgba(255, 255, 255, 0.2);
+        font-size: 0.95rem;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        border-left: 5px solid;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        cursor: pointer;
+        text-decoration: none !important;
+        color: inherit;
+        display: block;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+    
+    .stat-card-primary { border-left-color: #667eea; }
+    .stat-card-success { border-left-color: #27ae60; }
+    .stat-card-warning { border-left-color: #f39c12; }
+    .stat-card-danger { border-left-color: #e74c3c; }
+    .stat-card-info { border-left-color: #3498db; }
+    
+    .stat-card h5 {
+        color: #666;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .stat-card h3 {
+        color: #333;
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+    
+    .stat-icon {
+        font-size: 1.5rem;
+        margin-right: 10px;
+    }
+    
+    .workload-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+    
+    .workload-card h4 {
+        margin-top: 0;
+        color: #333;
+        font-weight: bold;
+    }
+    
+    .workload-bar {
+        background: #e0e0e0;
+        border-radius: 10px;
+        height: 30px;
+        overflow: hidden;
+        margin: 15px 0;
+    }
+    
+    .workload-fill {
+        height: 100%;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 10px;
+    }
+    
+    .action-button {
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: none;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn-view { background: #667eea; color: white; }
+    .btn-add { background: #27ae60; color: white; }
+    .btn-assign { background: #f39c12; color: white; }
+    
+    .assignments-section {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+    
+    .assignments-section h4 {
+        margin-top: 0;
+        color: #333;
+        font-weight: bold;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #667eea;
+    }
+    
+    .assignments-table {
+        margin-top: 15px;
+    }
+    
+    .assignments-table table {
+        margin: 0;
+    }
+    
+    .assignments-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+</style>
+
+<!-- Dashboard Header -->
+<div class="dashboard-header">
+    <h1>👋 Welcome, {{ current_user.name }}</h1>
+    <p>{{ current_user.designation }} - {{ current_user.department }}</p>
+    <div class="user-info">
+        <span>📧 {{ current_user.email }}</span>
+        {% if current_user.role == "admin" %}
+        <span style="margin-left: 20px;">🔑 <strong>Admin Access</strong></span>
+        {% endif %}
+    </div>
+</div>
+
+{% if current_user.role == "admin" %}
+<!-- Statistics Cards -->
+<div class="row">
+    <div class="col-md-6 col-lg-3">
+        <a href="/faculty-list" class="stat-card stat-card-primary">
+            <h5><span class="stat-icon">👥</span>Total Faculty</h5>
+            <h3>{{ total_faculty }}</h3>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <a href="/subject-list" class="stat-card stat-card-success">
+            <h5><span class="stat-icon">📚</span>Total Subjects</h5>
+            <h3>{{ total_subjects }}</h3>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <a href="/assignment-list" class="stat-card stat-card-warning">
+            <h5><span class="stat-icon">✅</span>Total Assignments</h5>
+            <h3>{{ total_assignments }}</h3>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <a href="/duty-list" class="stat-card stat-card-info">
+            <h5><span class="stat-icon">⚙️</span>Total Duties</h5>
+            <h3>{{ total_duties }}</h3>
+        </a>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <a href="/faculty-list" class="stat-card stat-card-danger">
+            <h5><span class="stat-icon">⚠️</span>Overloaded Faculty</h5>
+            <h3>{{ overloaded_count }}</h3>
+        </a>
+    </div>
+</div>
+
+<!-- Workload Card -->
+<div class="workload-card">
+    <h4>📊 Your Workload Status</h4>
+    <p style="color: #666; margin-bottom: 15px;">Total Hours per Week: <strong>{{ total_load }}</strong> / <strong>{{ current_user.max_workload }}</strong></p>
+    
+    <div class="workload-bar">
+        {% set percentage = (total_load / current_user.max_workload * 100) if current_user.max_workload > 0 else 0 %}
+        {% set capped_percentage = percentage if percentage <= 100 else 100 %}
+        {% if percentage > 100 %}
+            <div class="workload-fill" style="width: 100%; background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);">
+                {{ "%.0f"|format(percentage) }}%
+            </div>
+        {% elif percentage > 80 %}
+            <div class="workload-fill" style="width: {{ capped_percentage }}%; background: linear-gradient(90deg, #f39c12 0%, #e67e22 100%);">
+                {{ "%.0f"|format(percentage) }}%
+            </div>
+        {% else %}
+            <div class="workload-fill" style="width: {{ capped_percentage }}%; background: linear-gradient(90deg, #27ae60 0%, #229954 100%);">
+                {{ "%.0f"|format(percentage) }}%
+            </div>
+        {% endif %}
+    </div>
+    
+    <div>
+        {% if total_load > current_user.max_workload %}
+            <div class="alert alert-danger" style="margin: 0;">
+                ⚠️ <strong>Workload Exceeded!</strong> You have exceeded your maximum workload limit.
+            </div>
+        {% else %}
+            <div class="alert alert-success" style="margin: 0;">
+                ✅ <strong>Within Allowed Limit</strong> - Your workload is within the acceptable range.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="action-buttons">
+    <a href="/faculty-list" class="action-button btn-view">👥 View Faculty List</a>
+    <a href="/subject-list" class="action-button btn-view">📚 View Subjects</a>
+    <a href="/assignment-list" class="action-button btn-view">✅ View Assignments</a>
+    <a href="/duty-list" class="action-button btn-view">⚙️ View Duties</a>
+    
+    <a href="/add-faculty" class="action-button btn-add">➕ Add Faculty</a>
+    <a href="/add-subject" class="action-button btn-add">➕ Add Subject</a>
+    <a href="/add-duty" class="action-button btn-add">➕ Add Duty</a>
+    
+    <a href="/assign-subject" class="action-button btn-assign">🔗 Assign Subject</a>
+    <a href="/assign-duty" class="action-button btn-assign">🔗 Assign Duty</a>
+</div>
+
+{% endif %}
+
+{% if assignments %}
+<!-- Assigned Subjects Section -->
+<div class="assignments-section">
+    <h4>📖 Your Assigned Subjects</h4>
+    
+    <div class="assignments-table">
+        <table class="table table-hover table-striped">
+            <thead>
+                <tr>
+                    <th>Course Code</th>
+                    <th>Subject Name</th>
+                    <th>Type</th>
+                    <th>Academic Year</th>
+                    <th>Hours/Week</th>
+                    {% if current_user.role == "admin" %}
+                    <th>Action</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for assignment in assignments %}
+                <tr>
+                    <td><strong>{{ assignment.subject.course_code }}</strong></td>
+                    <td>{{ assignment.subject.subject_name }}</td>
+                    <td><span class="badge bg-secondary">{{ assignment.subject.subject_type }}</span></td>
+                    <td><span class="badge bg-primary">{{ assignment.academic_year }}</span></td>
+                    <td><span class="badge bg-info">{{ assignment.subject.hours_per_week }} hrs</span></td>
+                    {% if current_user.role == "admin" %}
+                    <td>
+                        <a href="/delete-assignment/{{ assignment.id }}" 
+                           class="btn btn-sm btn-danger"
+                           onclick="return confirm('Are you sure you want to remove this subject?')">
+                           🗑️ Remove
+                        </a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

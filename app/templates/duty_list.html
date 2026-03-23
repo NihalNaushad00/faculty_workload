@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .duty-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+</style>
+
+<div class="page-header">
+    <h2>⚙️ Duty Management</h2>
+    <div class="page-header-actions">
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+    </div>
+</div>
+
+<div class="duty-card">
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>👤 Faculty Name</th>
+                    <th>📋 Duty Name</th>
+                    <th>🏷️ Category</th>
+                    <th>⏰ Duration Type</th>
+                    <th>📅 Start Date</th>
+                    <th>📅 End Date</th>
+                    <th>⏱️ Hours/Week</th>
+                    <th>📊 Status</th>
+                    <th>⚙️ Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in duty_data %}
+                <tr>
+                    <td>
+                        <strong>
+                            {% if item.faculty_name == 'Unassigned' %}
+                                <span class="badge bg-secondary">{{ item.faculty_name }}</span>
+                            {% else %}
+                                {{ item.faculty_name }}
+                            {% endif %}
+                        </strong>
+                    </td>
+                    <td>{{ item.duty.duty_name }}</td>
+                    <td>
+                        <span class="badge bg-secondary">{{ item.category }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-info">{{ item.duration_type }}</span>
+                    </td>
+                    <td>
+                        <small>{{ item.start_date }}</small>
+                    </td>
+                    <td>
+                        <small>{{ item.end_date }}</small>
+                    </td>
+                    <td>
+                        <span class="badge bg-success">{{ item.hours }}</span>
+                    </td>
+                    <td>
+                        {% if item.is_active %}
+                            <span class="badge bg-success">✅ Active</span>
+                        {% else %}
+                            <span class="badge bg-danger">❌ Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="POST" action="{{ url_for('main.delete_duty', id=item.duty.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this duty?');">
+                            <button type="submit" class="btn btn-sm btn-danger">🗑️ Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if duty_data|length == 0 %}
+<div class="alert alert-info mt-4">ℹ️ No duties found.</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .form-card {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        max-width: 600px;
+        margin: 0 auto;
+    }
+</style>
+
+<div class="page-header">
+    <h2>🔗 Assign Duty to Faculty</h2>
+</div>
+
+<div class="form-card">
+    <form method="POST">
+        <div class="mb-4">
+            <label for="facultyId" class="form-label">👤 Select Faculty Member</label>
+            <select class="form-select" id="facultyId" name="faculty_id" required>
+                <option value="">Choose a faculty member...</option>
+                {% for faculty in faculties %}
+                <option value="{{ faculty.id }}">{{ faculty.name }} ({{ faculty.department }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label for="dutyId" class="form-label">📋 Select Duty</label>
+            <select class="form-select" id="dutyId" name="duty_id" required>
+                <option value="">Choose a duty...</option>
+                {% for duty in duties %}
+                <option value="{{ duty.id }}">
+                    {{ duty.duty_name }} ({{ duty.category }}) - {{ duty.academic_year }} - {{ duty.hours }} hrs/week
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-info btn-lg">✅ Assign Duty</button>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

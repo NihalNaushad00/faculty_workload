@@ -1,0 +1,12 @@
+{
+  "css.lint.validProperties": ["composes"],
+  "css.lint.universalSelector": "warning",
+  "css.lint.zeroUnits": "warning",
+  "[html]": {
+    "editor.formatOnSave": false
+  },
+  "files.associations": {
+    "*.html": "html"
+  },
+  "html.validate.styles": false
+}

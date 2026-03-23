@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .subject-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+</style>
+
+<div class="page-header">
+    <h2>📚 Subject Management</h2>
+    <div class="page-header-actions">
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+    </div>
+</div>
+
+<div class="subject-card">
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>📖 Course Code</th>
+                    <th>📝 Subject Name</th>
+                    <th>🏷️ Type</th>
+                    <th>🎓 Semester</th>
+                    <th>⏱️ Hours/Week</th>
+                    <th>📊 Assignments</th>
+                    <th>⚙️ Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in subject_data %}
+                <tr>
+                    <td>
+                        <strong>{{ item.subject.course_code }}</strong>
+                    </td>
+                    <td>{{ item.subject.subject_name }}</td>
+                    <td>
+                        {% if item.subject.is_lab %}
+                            <span class="badge bg-danger">⚗️ Lab</span>
+                        {% else %}
+                            <span class="badge bg-secondary">📚 {{ item.subject.subject_type }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.subject.semester %}
+                            <span class="badge bg-info">Sem {{ item.subject.semester }}</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-primary">{{ item.subject.hours_per_week }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-warning">{{ item.assignment_count }}</span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" disabled title="Coming Soon">✏️ Edit</button>
+                        <form method="POST" action="{{ url_for('main.delete_subject', id=item.subject.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this subject? This will also delete all related assignments.');">
+                            <button type="submit" class="btn btn-sm btn-danger">🗑️ Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if subject_data|length == 0 %}
+<div class="alert alert-info mt-4">ℹ️ No subjects found.</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .faculty-card {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+</style>
+
+<div class="page-header">
+    <h2>👥 Faculty Members</h2>
+    <div class="page-header-actions">
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
+    </div>
+</div>
+
+<div class="faculty-card">
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>👤 Name</th>
+                    <th>🏢 Department</th>
+                    <th>📌 Designation</th>
+                    <th>💼 Total Workload</th>
+                    <th>📊 Max Workload</th>
+                    <th>⚡ Status</th>
+                    <th>🔍 Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in faculty_data %}
+                <tr>
+                    <td><strong>{{ item.faculty.name }}</strong></td>
+                    <td>{{ item.faculty.department }}</td>
+                    <td>{{ item.faculty.designation }}</td>
+                    <td>
+                        <span class="badge bg-info">{{ item.total_workload }} hrs</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-primary">{{ item.faculty.max_workload }} hrs</span>
+                    </td>
+                    <td>
+                        {% if item.status == "Overloaded" %}
+                            <span class="badge bg-danger">⚠️ {{ item.status }}</span>
+                        {% else %}
+                            <span class="badge bg-success">✅ {{ item.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('main.faculty_profile', id=item.faculty.id) }}" class="btn btn-sm btn-primary">
+                            👁️ View Profile
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if faculty_data|length == 0 %}
+<div class="alert alert-info mt-4">ℹ️ No faculty members found.</div>
+{% endif %}
+
+{% endblock %}

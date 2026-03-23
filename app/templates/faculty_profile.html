@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2>Faculty Profile</h2>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('main.faculty_list') }}" class="btn btn-secondary">Back to Faculty List</a>
+    </div>
+</div>
+
+<!-- Faculty Details Card -->
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">Personal Information</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Name:</strong> {{ faculty.name }}</p>
+                <p><strong>Department:</strong> {{ faculty.department }}</p>
+                <p><strong>Designation:</strong> {{ faculty.designation }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Email:</strong> {{ faculty.email }}</p>
+                <p><strong>Role:</strong> <span class="badge bg-info">{{ faculty.role }}</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Workload Summary Card -->
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">Workload Summary</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <p><strong>Total Workload:</strong></p>
+                <h4><span class="badge bg-info">{{ total_workload }} hours</span></h4>
+            </div>
+            <div class="col-md-4">
+                <p><strong>Max Workload:</strong></p>
+                <h4><span class="badge bg-primary">{{ faculty.max_workload }} hours</span></h4>
+            </div>
+            <div class="col-md-4">
+                <p><strong>Workload Percentage:</strong></p>
+                <h4>
+                    {% if workload_percentage > 100 %}
+                        <span class="badge bg-danger">{{ "%.1f"|format(workload_percentage) }}%</span>
+                    {% elif workload_percentage > 80 %}
+                        <span class="badge bg-warning">{{ "%.1f"|format(workload_percentage) }}%</span>
+                    {% else %}
+                        <span class="badge bg-success">{{ "%.1f"|format(workload_percentage) }}%</span>
+                    {% endif %}
+                </h4>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mt-3">
+            <div class="progress" style="height: 25px;">
+                {% set capped_percentage = workload_percentage if workload_percentage <= 100 else 100 %}
+
+                {% if workload_percentage > 100 %}
+                    <div class="progress-bar bg-danger" role="progressbar"
+                         style="width: 100%;"
+                         aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
+                        {{ "%.1f"|format(workload_percentage) }}%
+                    </div>
+                {% elif workload_percentage > 80 %}
+                    <div class="progress-bar bg-warning" role="progressbar"
+                         style="width: {{ capped_percentage }}%;"
+                         aria-valuenow="{{ capped_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                        {{ "%.1f"|format(workload_percentage) }}%
+                    </div>
+                {% else %}
+                    <div class="progress-bar bg-success" role="progressbar"
+                         style="width: {{ capped_percentage }}%;"
+                         aria-valuenow="{{ capped_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                        {{ "%.1f"|format(workload_percentage) }}%
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Assigned Subjects Card -->
+<div class="card">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">Assigned Subjects</h5>
+    </div>
+    <div class="card-body">
+        {% if assignments|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Course Code</th>
+                        <th>Subject Name</th>
+                        <th>Type</th>
+                        <th>Hours/Week</th>
+                        <th>Academic Year</th>
+                        <th>Semester</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for assignment in assignments %}
+                    <tr>
+                        <td>{{ assignment.subject.course_code }}</td>
+                        <td>{{ assignment.subject.subject_name }}</td>
+                        <td>
+                            <span class="badge bg-secondary">{{ assignment.subject.subject_type }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ assignment.subject.hours_per_week }}</span>
+                        </td>
+                        <td>
+                            <strong>{{ assignment.academic_year }}</strong>
+                        </td>
+                        <td>
+                            {% if assignment.subject.semester %}
+                                Semester {{ assignment.subject.semester }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">No subjects assigned to this faculty.</div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

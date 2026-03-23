@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .form-card {
+        background: white;
+        border-radius: 10px;
+        padding: 30px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        max-width: 600px;
+        margin: 0 auto;
+    }
+</style>
+
+<div class="page-header">
+    <h2>➕ Add New Subject</h2>
+</div>
+
+<div class="form-card">
+    <form method="POST">
+        <div class="mb-4">
+            <label for="courseCode" class="form-label">📖 Course Code</label>
+            <input type="text" id="courseCode" name="course_code" class="form-control" required placeholder="e.g., CS101">
+        </div>
+
+        <div class="mb-4">
+            <label for="subjectName" class="form-label">📝 Subject Name</label>
+            <input type="text" id="subjectName" name="subject_name" class="form-control" required placeholder="e.g., Data Structures">
+        </div>
+
+        <div class="mb-4">
+            <label for="subjectType" class="form-label">🏷️ Type</label>
+            <select id="subjectType" name="subject_type" class="form-select">
+                <option value="">Select Type</option>
+                <option value="Theory">Theory</option>
+                <option value="Lab">Lab</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label for="hours" class="form-label">⏱️ Hours per Week</label>
+            <input type="number" id="hours" name="hours" class="form-control" min="1" max="40" required placeholder="e.g., 3 (Lab: 3, Theory: 1-2)">
+        </div>
+
+        <div class="mb-4">
+            <label for="semester" class="form-label">🎓 Semester</label>
+            <input type="number" id="semester" name="semester" class="form-control" min="1" max="8" required placeholder="e.g., 1">
+        </div>
+
+        <div class="mb-4 form-check">
+            <input type="checkbox" id="isLab" name="is_lab" class="form-check-input">
+            <label for="isLab" class="form-check-label">
+                ⚗️ This is a Lab Subject (3 hours continuous class)
+            </label>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success btn-lg">✅ Add Subject</button>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
