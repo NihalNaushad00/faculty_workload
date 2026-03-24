@@ -4,6 +4,7 @@ from app.models import Faculty, Subject, Assignment, AdditionalDuty, Timetable, 
 from flask import request, redirect, url_for
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime, timedelta
+import random
 
 main = Blueprint('main', __name__)
 
@@ -29,6 +30,69 @@ def get_reference_date():
         return datetime.strptime(requested_date, '%Y-%m-%d').date() if requested_date else datetime.utcnow().date()
     except ValueError:
         return datetime.utcnow().date()
+
+
+def allocate_duty_slots(duty, timetable_grid, days, hours, week_dates, seed_value):
+    """
+    Spread duty hours across free slots in the displayed week.
+
+    The allocation is randomized but deterministic for the same duty/week so
+    the timetable does not reshuffle on every page refresh.
+    """
+    rng = random.Random(seed_value)
+    free_slots_by_day = {}
+
+    for day in days:
+        duty_date = week_dates[day]
+        if not duty.is_active(duty_date):
+            continue
+
+        free_hours = [hour for hour in hours if timetable_grid[day][hour] is None]
+        if not free_hours:
+            continue
+
+        rng.shuffle(free_hours)
+        free_slots_by_day[day] = free_hours
+
+    if not free_slots_by_day:
+        return []
+
+    remaining_hours = max(duty.hours, 0)
+    allocated_slots = []
+    available_days = list(free_slots_by_day.keys())
+    rng.shuffle(available_days)
+
+    # First spread one slot per day to avoid stacking duty hours continuously.
+    for day in list(available_days):
+        if remaining_hours == 0:
+            break
+
+        day_slots = free_slots_by_day[day]
+        if not day_slots:
+            continue
+
+        allocated_slots.append((day, day_slots.pop(0)))
+        remaining_hours -= 1
+
+    # If duty hours still remain, continue filling the leftover free slots.
+    while remaining_hours > 0:
+        candidate_days = [day for day, slots in free_slots_by_day.items() if slots]
+        if not candidate_days:
+            break
+
+        rng.shuffle(candidate_days)
+        for day in candidate_days:
+            if remaining_hours == 0:
+                break
+
+            day_slots = free_slots_by_day[day]
+            if not day_slots:
+                continue
+
+            allocated_slots.append((day, day_slots.pop(0)))
+            remaining_hours -= 1
+
+    return allocated_slots
 
 @main.route('/')
 def home():
@@ -617,34 +681,34 @@ def faculty_timetable():
     
     displayed_duties = []
 
-    # Add duties only on their assigned weekday within the displayed week.
+    # Spread duties across free slots in the displayed week.
     for duty in active_duties:
-        if not duty.duty_day or duty.duty_day not in timetable_grid:
-            continue
+        allocated_slots = allocate_duty_slots(
+            duty,
+            timetable_grid,
+            days,
+            hours,
+            week_dates,
+            f"{current_user.id}-{duty.id}-{week_start.isoformat()}"
+        )
 
-        duty_date = week_dates[duty.duty_day]
-        if not duty.occurs_on_date(duty_date):
+        if not allocated_slots:
             continue
 
         displayed_duties.append(duty)
 
-        hours_remaining = max(duty.hours, 0)
-        for hour in hours:
-            if hours_remaining == 0:
-                break
-
-            if timetable_grid[duty.duty_day][hour] is None:
-                timetable_grid[duty.duty_day][hour] = {
-                    'duty_name': duty.duty_name,
-                    'category': duty.category,
-                    'hours': duty.hours,
-                    'type': 'duty',
-                    'duty_day': duty.duty_day,
-                    'duty_date': duty_date.strftime('%d-%m-%Y'),
-                    'start_date': duty.start_date.strftime('%d-%m-%Y'),
-                    'end_date': duty.end_date.strftime('%d-%m-%Y')
-                }
-                hours_remaining -= 1
+        for day, hour in allocated_slots:
+            duty_date = week_dates[day]
+            timetable_grid[day][hour] = {
+                'duty_name': duty.duty_name,
+                'category': duty.category,
+                'hours': duty.hours,
+                'type': 'duty',
+                'duty_day': day,
+                'duty_date': duty_date.strftime('%d-%m-%Y'),
+                'start_date': duty.start_date.strftime('%d-%m-%Y'),
+                'end_date': duty.end_date.strftime('%d-%m-%Y')
+            }
     
     return render_template(
         'faculty_timetable.html',
