@@ -67,6 +67,9 @@
                         <a href="{{ url_for('main.faculty_profile', id=item.faculty.id) }}" class="btn btn-sm btn-primary">
                             👁️ View Profile
                         </a>
+                        <a href="{{ url_for('main.faculty_timetable_admin', id=item.faculty.id) }}" class="btn btn-sm btn-info">
+                            📅 View Timetable
+                        </a>
                     </td>
                 </tr>
                 {% endfor %}

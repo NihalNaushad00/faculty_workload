@@ -28,7 +28,7 @@ def seed_database():
             email='admin@ktu.edu',
             department='Administration',
             designation='System Administrator',
-            max_workload=16,
+            max_workload=20,
             role='admin'
         )
         admin.set_password('admin123')
@@ -43,7 +43,7 @@ def seed_database():
                 email='rajesh@ktu.edu',
                 department='Computer Science',
                 designation='Associate Professor',
-                max_workload=16,
+                max_workload=20,
                 role='faculty'
             ),
             Faculty(
@@ -51,7 +51,7 @@ def seed_database():
                 email='priya@ktu.edu',
                 department='Computer Science',
                 designation='Professor',
-                max_workload=14,
+                max_workload=20,
                 role='faculty'
             ),
             Faculty(
@@ -59,7 +59,7 @@ def seed_database():
                 email='arun@ktu.edu',
                 department='Electronics',
                 designation='Assistant Professor',
-                max_workload=18,
+                max_workload=20,
                 role='faculty'
             ),
             Faculty(
@@ -67,7 +67,7 @@ def seed_database():
                 email='neha@ktu.edu',
                 department='Computer Science',
                 designation='Assistant Professor',
-                max_workload=18,
+                max_workload=20,
                 role='faculty'
             ),
             Faculty(
@@ -75,7 +75,7 @@ def seed_database():
                 email='vikram@ktu.edu',
                 department='Electronics',
                 designation='Associate Professor',
-                max_workload=16,
+                max_workload=20,
                 role='faculty'
             ),
         ]

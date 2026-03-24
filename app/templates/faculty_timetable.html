@@ -32,9 +32,9 @@
 
     <!-- Timetable Grid -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <a class="btn btn-outline-secondary" href="{{ url_for('main.faculty_timetable', academic_year=academic_year, week_start=previous_week.strftime('%Y-%m-%d')) }}">Previous Week</a>
+        <a class="btn btn-outline-secondary" href="{{ previous_week_url }}">Previous Week</a>
         <strong>{{ week_start.strftime('%d %b') }} - {{ week_end.strftime('%d %b %Y') }}</strong>
-        <a class="btn btn-outline-secondary" href="{{ url_for('main.faculty_timetable', academic_year=academic_year, week_start=next_week.strftime('%Y-%m-%d')) }}">Next Week</a>
+        <a class="btn btn-outline-secondary" href="{{ next_week_url }}">Next Week</a>
     </div>
 
     <div class="card border-0 shadow-sm">
@@ -90,7 +90,7 @@
                                             <i class="bi bi-tag"></i> {{ entry.category }}
                                         </p>
                                         <p class="mb-0 small text-muted">
-                                            <i class="bi bi-clock"></i> {{ entry.hours }} hrs
+                                            <i class="bi bi-clock"></i> {{ entry.allocated_hours }} of {{ entry.hours }} hrs this week
                                         </p>
                                         <p class="mb-0 small text-muted">
                                             <i class="bi bi-calendar-event"></i> {{ entry.duty_day }}, {{ entry.duty_date }}
@@ -158,7 +158,7 @@
                         </p>
                         <p class="mb-0">
                             <strong>Total Workload:</strong> 
-                            <span class="badge bg-success">{{ teaching_hours + total_duty_hours }} / 16 hrs</span>
+                            <span class="badge bg-success">{{ teaching_hours + total_duty_hours }} / {{ faculty_max_workload }} hrs</span>
                         </p>
                     </div>
                 </div>

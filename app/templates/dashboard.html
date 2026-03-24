@@ -89,6 +89,21 @@
         color: #333;
         font-weight: bold;
     }
+
+    .overload-alert {
+        background: linear-gradient(135deg, #fff1f0 0%, #ffe3df 100%);
+        border: 1px solid #f5b7b1;
+        border-left: 6px solid #e74c3c;
+    }
+
+    .overload-alert ul {
+        margin: 12px 0 0 18px;
+    }
+
+    .overload-alert li {
+        margin-bottom: 6px;
+        color: #7b241c;
+    }
     
     .workload-bar {
         background: #e0e0e0;
@@ -194,6 +209,29 @@
     <p style="color: #666; margin: 12px 0 0 0;">Workload and overload counts are calculated for {{ reference_date.strftime('%d %b %Y') }}.</p>
 </div>
 
+{% if overloaded_faculty %}
+<div class="workload-card overload-alert">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <h4>⚠️ Faculty Overload Alert</h4>
+            <p style="margin-bottom: 8px; color: #7b241c;">
+                Some faculty members are overloaded on {{ reference_date.strftime('%d %b %Y') }}. Please reduce work for them.
+            </p>
+            <ul>
+                {% for item in overloaded_faculty %}
+                <li><strong>{{ item.name }}</strong>: {{ item.total_workload }} / {{ item.max_workload }} hrs</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div>
+            <a href="{{ url_for('main.duty_assigned_list', overloaded_faculty=overloaded_faculty_names) }}" class="btn btn-danger">
+                Review Assigned Duties
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Statistics Cards -->
 <div class="row">
     <div class="col-md-6 col-lg-3">
@@ -225,9 +263,9 @@
     </div>
 
     <div class="col-md-6 col-lg-3">
-        <a href="/faculty-list" class="stat-card stat-card-danger">
-            <h5><span class="stat-icon">⚠️</span>Overloaded Faculty</h5>
-            <h3>{{ overloaded_count }}</h3>
+        <a href="{{ url_for('main.duty_assigned_list') }}" class="stat-card stat-card-danger">
+            <h5><span class="stat-icon">📌</span>Duty Assigned</h5>
+            <h3>{{ assigned_duty_count }}</h3>
         </a>
     </div>
 </div>
@@ -270,15 +308,9 @@
 
 <!-- Action Buttons -->
 <div class="action-buttons">
-    <a href="/faculty-list" class="action-button btn-view">👥 View Faculty List</a>
-    <a href="/subject-list" class="action-button btn-view">📚 View Subjects</a>
-    <a href="/assignment-list" class="action-button btn-view">✅ View Assignments</a>
-    <a href="/duty-list" class="action-button btn-view">⚙️ View Duties</a>
-    
     <a href="/add-faculty" class="action-button btn-add">➕ Add Faculty</a>
     <a href="/add-subject" class="action-button btn-add">➕ Add Subject</a>
     <a href="/add-duty" class="action-button btn-add">➕ Add Duty</a>
-    
     <a href="/assign-subject" class="action-button btn-assign">🔗 Assign Subject</a>
     <a href="/assign-duty" class="action-button btn-assign">🔗 Assign Duty</a>
 </div>

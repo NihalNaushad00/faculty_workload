@@ -44,11 +44,11 @@ def create_admin():
         department = input("🏢 Enter department (default: Computer Science): ").strip() or "Computer Science"
         designation = input("🎓 Enter designation (default: Professor): ").strip() or "Professor"
         
-        max_workload = input("📊 Enter max workload hours/week (default: 16): ").strip()
+        max_workload = input("📊 Enter max workload hours/week (default: 20): ").strip()
         try:
-            max_workload = int(max_workload) if max_workload else 16
+            max_workload = int(max_workload) if max_workload else 20
         except ValueError:
-            max_workload = 16
+            max_workload = 20
         
         # Create admin
         admin = Faculty(

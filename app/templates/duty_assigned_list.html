@@ -11,7 +11,7 @@
 </style>
 
 <div class="page-header">
-    <h2>⚙️ Duty Management</h2>
+    <h2>📌 Duty Assigned List</h2>
     <div class="page-header-actions">
         <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary btn-sm">← Back to Dashboard</a>
     </div>
@@ -27,7 +27,7 @@
             <button type="submit" class="btn btn-primary w-100">Apply</button>
         </div>
     </form>
-    <small class="text-muted d-block mt-2">Duty status is calculated for {{ reference_date.strftime('%d %b %Y') }}.</small>
+    <small class="text-muted d-block mt-2">Assigned duty status is calculated for {{ reference_date.strftime('%d %b %Y') }}.</small>
 </div>
 
 <div class="duty-card">
@@ -42,6 +42,7 @@
                     <th>🗓️ Preferred Days</th>
                     <th>📅 Start Date</th>
                     <th>📅 End Date</th>
+                    <th>📅 Academic Year</th>
                     <th>⏱️ Hours/Week</th>
                     <th>📊 Status</th>
                     <th>⚙️ Action</th>
@@ -50,34 +51,15 @@
             <tbody>
                 {% for item in duty_data %}
                 <tr>
-                    <td>
-                        <strong>
-                            {% if item.faculty_name == 'Unassigned' %}
-                                <span class="badge bg-secondary">{{ item.faculty_name }}</span>
-                            {% else %}
-                                {{ item.faculty_name }}
-                            {% endif %}
-                        </strong>
-                    </td>
+                    <td><strong>{{ item.faculty_name }}</strong></td>
                     <td>{{ item.duty.duty_name }}</td>
-                    <td>
-                        <span class="badge bg-secondary">{{ item.category }}</span>
-                    </td>
-                    <td>
-                        <span class="badge bg-info">{{ item.duration_type }}</span>
-                    </td>
-                    <td>
-                        <span class="badge bg-warning text-dark">{{ item.duty_day or '-' }}</span>
-                    </td>
-                    <td>
-                        <small>{{ item.start_date }}</small>
-                    </td>
-                    <td>
-                        <small>{{ item.end_date }}</small>
-                    </td>
-                    <td>
-                        <span class="badge bg-success">{{ item.hours }}</span>
-                    </td>
+                    <td><span class="badge bg-secondary">{{ item.category }}</span></td>
+                    <td><span class="badge bg-info">{{ item.duration_type }}</span></td>
+                    <td><span class="badge bg-warning text-dark">{{ item.duty_day or '-' }}</span></td>
+                    <td><small>{{ item.start_date }}</small></td>
+                    <td><small>{{ item.end_date }}</small></td>
+                    <td><span class="badge bg-primary">{{ item.academic_year }}</span></td>
+                    <td><span class="badge bg-success">{{ item.hours }}</span></td>
                     <td>
                         {% if item.is_active %}
                             <span class="badge bg-success">✅ Active</span>
@@ -98,7 +80,7 @@
 </div>
 
 {% if duty_data|length == 0 %}
-<div class="alert alert-info mt-4">ℹ️ No duties found.</div>
+<div class="alert alert-info mt-4">ℹ️ No assigned duties found.</div>
 {% endif %}
 
 {% endblock %}

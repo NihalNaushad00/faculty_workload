@@ -36,7 +36,7 @@
 
         <div class="mb-4">
             <label for="durationType" class="form-label">⏰ Duration Type</label>
-            <select id="durationType" name="duration_type" class="form-select" required onchange="updateDateLabels()">
+            <select id="durationType" name="duration_type" class="form-select" required>
                 <option value="">Select Duration Type</option>
                 <option value="Yearly">📅 Yearly (Full Academic Year)</option>
                 <option value="Weekly">📆 Weekly (One Week Only)</option>
@@ -44,16 +44,27 @@
             </select>
         </div>
 
-        <div class="mb-4">
-            <label for="startDate" class="form-label">📅 Start Date</label>
-            <input type="date" id="startDate" name="start_date" class="form-control" required>
-            <small class="text-muted">When the duty begins</small>
+        <div class="mb-4" id="academicYearSection">
+            <label for="academicYear" class="form-label">📅 Academic Year</label>
+            <select id="academicYear" name="academic_year" class="form-select" required>
+                <option value="">Select Year</option>
+                <option value="2024-25">2024-25</option>
+                <option value="2025-26">2025-26</option>
+                <option value="2026-27">2026-27</option>
+            </select>
+            <small class="text-muted" id="academicYearHelp">Select the academic year for this duty.</small>
         </div>
 
-        <div class="mb-4">
-            <label for="endDate" class="form-label">📅 End Date</label>
-            <input type="date" id="endDate" name="end_date" class="form-control" required>
-            <small class="text-muted">When the duty ends</small>
+        <div class="mb-4" id="startDateSection">
+            <label for="startDate" class="form-label" id="startDateLabel">📅 Start Date</label>
+            <input type="date" id="startDate" name="start_date" class="form-control">
+            <small class="text-muted" id="startDateHelp">When the duty begins</small>
+        </div>
+
+        <div class="mb-4" id="endDateSection">
+            <label for="endDate" class="form-label" id="endDateLabel">📅 End Date</label>
+            <input type="date" id="endDate" name="end_date" class="form-control">
+            <small class="text-muted" id="endDateHelp">When the duty ends</small>
         </div>
 
         <div class="mb-4">
@@ -62,26 +73,18 @@
         </div>
 
         <div class="mb-4">
-            <label for="dutyDay" class="form-label">🗓️ Duty Day</label>
-            <select id="dutyDay" name="duty_day" class="form-select" required>
-                <option value="">Select Day</option>
-                <option value="Monday">Monday</option>
-                <option value="Tuesday">Tuesday</option>
-                <option value="Wednesday">Wednesday</option>
-                <option value="Thursday">Thursday</option>
-                <option value="Friday">Friday</option>
-            </select>
-            <small class="text-muted">The duty will appear only on this day in the weekly timetable.</small>
-        </div>
-
-        <div class="mb-4">
-            <label for="academicYear" class="form-label">📅 Academic Year</label>
-            <select id="academicYear" name="academic_year" class="form-select" required>
-                <option value="">Select Year</option>
-                <option value="2024-25">2024-25</option>
-                <option value="2025-26">2025-26</option>
-                <option value="2026-27">2026-27</option>
-            </select>
+            <label class="form-label">🗓️ Preferred Days</label>
+            <div class="row g-2">
+                {% for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] %}
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input preferred-day" type="checkbox" value="{{ day }}" id="day{{ loop.index }}" name="preferred_days">
+                        <label class="form-check-label" for="day{{ loop.index }}">{{ day }}</label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <small class="text-muted">Optional. Selected days are preferred first, then remaining hours are spread randomly into free slots in that week. Do not select more days than hours/week.</small>
         </div>
 
         <div class="d-flex gap-2">
@@ -92,41 +95,115 @@
 </div>
 
 <script>
-    function updateDateLabels() {
-        const durationType = document.getElementById('durationType').value;
-        const startLabel = document.querySelector('label[for="startDate"]');
-        const endLabel = document.querySelector('label[for="endDate"]');
-        
-        if (durationType === 'Yearly') {
-            startLabel.textContent = '📅 Academic Year Start Date';
-            document.querySelector('small:nth-of-type(1)').textContent = 'Typically July/August';
-        } else if (durationType === 'Weekly') {
-            startLabel.textContent = '📅 Week Start Date (Monday)';
-            document.querySelector('small:nth-of-type(1)').textContent = 'Monday of the exam week';
-        } else {
-            startLabel.textContent = '📅 Start Date';
-            document.querySelector('small:nth-of-type(1)').textContent = 'Flexible start date';
+    const durationTypeInput = document.getElementById('durationType');
+    const academicYearInput = document.getElementById('academicYear');
+    const academicYearHelp = document.getElementById('academicYearHelp');
+    const startDateSection = document.getElementById('startDateSection');
+    const startDateInput = document.getElementById('startDate');
+    const startDateLabel = document.getElementById('startDateLabel');
+    const startDateHelp = document.getElementById('startDateHelp');
+    const endDateSection = document.getElementById('endDateSection');
+    const endDateInput = document.getElementById('endDate');
+    const endDateHelp = document.getElementById('endDateHelp');
+
+    function getAcademicYearRange(academicYear) {
+        if (!academicYear || academicYear.length < 4) {
+            return { start: '', end: '' };
         }
+
+        const startYear = Number.parseInt(academicYear.slice(0, 4), 10);
+        if (Number.isNaN(startYear)) {
+            return { start: '', end: '' };
+        }
+
+        return {
+            start: `${startYear}-06-01`,
+            end: `${startYear + 1}-05-31`
+        };
     }
-    
-    // Auto-set end date when duration type changes
-    document.getElementById('durationType').addEventListener('change', function() {
-        const startDate = document.getElementById('startDate').value;
-        const durationType = this.value;
-        
-        if (!startDate) return;
-        
-        const start = new Date(startDate);
-        let end = new Date(start);
-        
-        if (durationType === 'Weekly') {
-            end.setDate(end.getDate() + 6); // One week
-        } else if (durationType === 'Yearly') {
-            end.setFullYear(end.getFullYear() + 1);
-            end.setDate(end.getDate() - 1); // Day before next year
+
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function syncWeeklyEndDate() {
+        if (durationTypeInput.value !== 'Weekly' || !startDateInput.value) {
+            return;
         }
-        
-        document.getElementById('endDate').value = end.toISOString().split('T')[0];
-        updateDateLabels();
+
+        const start = new Date(`${startDateInput.value}T00:00:00`);
+        if (Number.isNaN(start.getTime())) {
+            return;
+        }
+
+        if (start.getDay() !== 1) {
+            endDateInput.value = '';
+            return;
+        }
+
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        endDateInput.value = formatDate(end);
+    }
+
+    function updateDurationFields() {
+        const durationType = durationTypeInput.value;
+
+        startDateSection.style.display = '';
+        endDateSection.style.display = '';
+        startDateInput.required = false;
+        endDateInput.required = false;
+        endDateInput.readOnly = false;
+        academicYearHelp.textContent = 'Select the academic year for this duty.';
+
+        if (durationType === 'Yearly') {
+            const range = getAcademicYearRange(academicYearInput.value);
+            startDateSection.style.display = 'none';
+            endDateSection.style.display = 'none';
+            startDateInput.value = range.start;
+            endDateInput.value = range.end;
+            academicYearHelp.textContent = 'This will automatically use 01 June to 31 May for the selected academic year.';
+            return;
+        }
+
+        if (durationType === 'Weekly') {
+            startDateLabel.textContent = '📅 Week Start Date (Monday)';
+            startDateHelp.textContent = 'Select the Monday of the week.';
+            endDateHelp.textContent = 'End date is automatically set to Sunday.';
+            startDateInput.required = true;
+            endDateInput.required = true;
+            endDateInput.readOnly = true;
+            syncWeeklyEndDate();
+            return;
+        }
+
+        startDateLabel.textContent = '📅 Start Date';
+        startDateHelp.textContent = 'When the duty begins';
+        endDateHelp.textContent = 'When the duty ends';
+        startDateInput.required = true;
+        endDateInput.required = true;
+        startDateInput.value = startDateInput.value;
+        endDateInput.readOnly = false;
+    }
+
+    durationTypeInput.addEventListener('change', updateDurationFields);
+    academicYearInput.addEventListener('change', updateDurationFields);
+    startDateInput.addEventListener('change', syncWeeklyEndDate);
+
+    document.getElementById('hours').addEventListener('input', function() {
+        const maxSelections = parseInt(this.value || '0', 10);
+        const checked = Array.from(document.querySelectorAll('.preferred-day:checked'));
+        if (maxSelections > 0 && checked.length > maxSelections) {
+            checked.slice(maxSelections).forEach((checkbox) => {
+                checkbox.checked = false;
+            });
+        }
     });
+
+    updateDurationFields();
 </script>
+
+{% endblock %}

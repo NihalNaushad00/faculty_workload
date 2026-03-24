@@ -1,0 +1,140 @@
+Faculty Workload Project - Constraints Checked
+
+This file lists the main constraints and validations currently enforced in the project code.
+
+1. Authentication and access control
+
+- Login succeeds only if the email exists and the password matches.
+- Invalid login shows a notification: invalid credentials.
+- Admin-only pages and actions deny access for non-admin users.
+
+2. Database-level uniqueness constraints
+
+- Faculty email must be unique.
+- A subject assignment is unique for:
+  faculty_id + subject_id + class_id + academic_year
+- An additional duty assignment is unique for:
+  faculty_id + duty_name + start_date
+- Class name must be unique.
+
+3. Subject assignment constraints
+
+When assigning a subject to a faculty member, the system checks:
+
+- Faculty, subject, and class must all exist.
+- The subject semester must match the selected class semester.
+- The same subject cannot be assigned to two different teachers for the same class in the same academic year.
+  Example:
+  If Python is already assigned for S7CSA in 2025-26, another faculty member cannot also be assigned Python for S7CSA in 2025-26.
+- The same faculty cannot receive the exact same subject for the same class and same academic year twice.
+- Projected faculty workload cannot exceed the faculty max workload.
+  Projected workload = teaching hours in that academic year + active duty hours in that academic year + new subject hours
+- After subject assignment, timetable generation is triggered for that semester and academic year.
+
+4. Faculty workload constraints
+
+- Each faculty has a max_workload value.
+- A faculty is treated as overloaded when:
+  total_workload > max_workload
+- Total workload is:
+  teaching hours + active duty hours
+- Admin dashboard highlights overloaded faculty.
+- Faculty list marks faculty as Safe or Overloaded.
+
+5. Duty creation constraints
+
+When adding a duty, the system checks:
+
+- Hours per week must be a valid integer.
+- For Yearly duty:
+  start date and end date are derived automatically from the academic year.
+  Current assumption:
+  start = June 1 of the starting year
+  end = May 31 of the next year
+- For Weekly duty:
+  the chosen start date must be a Monday
+  the end date is set automatically to Sunday
+- For Custom duty:
+  both start date and end date must be valid dates
+- End date must be after start date.
+- Number of preferred days cannot be more than duty hours per week.
+
+6. Duty assignment constraints
+
+When assigning a duty to a faculty member, the system checks:
+
+- Faculty and duty must both exist.
+- The same duty name with the same start date cannot already be assigned to that faculty.
+- Duty capacity must be valid before assignment.
+
+Duty capacity validation checks:
+
+- If the faculty already has assignments in that academic year but no generated timetable, duty assignment is blocked.
+- The duty must contain at least one working day from Monday to Friday in its date range.
+- The duty must fit into the faculty's free timetable hours for a representative active week.
+- If the system cannot allocate enough free slots equal to duty.hours, assignment is blocked.
+
+7. Duty activity constraints
+
+- A duty is active only when:
+  start_date <= reference_date <= end_date
+- A duty overlaps a displayed week when:
+  start_date <= week_end and end_date >= week_start
+- If preferred days are set, a duty occurs only on those weekdays.
+
+8. Timetable generation constraints
+
+Global timetable assumptions:
+
+- Working days are Monday to Friday.
+- There are 6 periods per day.
+- MAX_DAILY_HOURS = 3
+- TOTAL_SLOTS_PER_DAY = 6
+
+Slot availability checks:
+
+- A faculty cannot exceed 3 scheduled teaching periods in a day.
+- A faculty's teaching hours plus duty hours on a day cannot exceed 6 total slots.
+- A class cannot have two timetable entries in the same timeslot.
+- A faculty cannot have two timetable entries in the same timeslot.
+
+Lab scheduling checks:
+
+- Lab subjects are scheduled before theory subjects.
+- Labs require continuous slots.
+- A lab block is scheduled only if a continuous sequence of required length is available.
+- A lab is blocked if adding its weekly hours would exceed the faculty max workload.
+
+Theory scheduling checks:
+
+- Theory subjects are distributed across lighter-load days first.
+- The scheduler prefers balanced day distribution across the week.
+- A theory subject is blocked if adding its weekly hours would exceed the faculty max workload.
+- If all required weekly hours cannot be placed, the subject is reported as partially scheduled or failed.
+
+9. Timetable regeneration behavior
+
+- When a subject is assigned, timetable generation is run again for that semester and academic year.
+- When a subject assignment is deleted, timetable generation is run again for that semester and academic year.
+- Timetable generation clears existing timetable entries for the target semester and academic year before rebuilding.
+
+10. Dashboard and list-page logic constraints
+
+- Admin dashboard analytics use the selected reference date for overload checking.
+- Faculty dashboard duty counts and workload use only active duties for the selected reference date.
+- Duty list active/inactive status uses the selected reference date.
+- Assigned duty list shows only duties where faculty_id is not null.
+
+11. Notification behavior
+
+- Invalid login uses notification instead of plain text.
+- Subject assignment validation failures use notifications.
+- Duty creation validation failures use notifications.
+- Duty assignment validation failures use notifications.
+- Admin overload alert links to assigned duties and shows a warning asking to reduce work for overloaded faculty.
+
+12. Current gaps not strictly enforced everywhere
+
+- Add faculty duplicate email is still returned as plain text instead of notification.
+- Add subject form does not currently enforce extra validation beyond required fields and type conversion.
+- Some admin-only failures still return plain text "Access Denied: Admins Only".

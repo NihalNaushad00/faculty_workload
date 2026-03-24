@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template
 from app import db
 from app.models import Faculty, Subject, Assignment, AdditionalDuty, Timetable, TimeSlot, Class
-from flask import request, redirect, url_for
+from app.utils import generate_timetable
+from flask import request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime, timedelta
 import random
@@ -32,6 +33,12 @@ def get_reference_date():
         return datetime.utcnow().date()
 
 
+def get_academic_year_date_range(academic_year):
+    """Map an academic year like 2025-26 to an assumed June-May date range."""
+    start_year = int(academic_year[:4])
+    return datetime(start_year, 6, 1).date(), datetime(start_year + 1, 5, 31).date()
+
+
 def allocate_duty_slots(duty, timetable_grid, days, hours, week_dates, seed_value):
     """
     Spread duty hours across free slots in the displayed week.
@@ -59,11 +66,14 @@ def allocate_duty_slots(duty, timetable_grid, days, hours, week_dates, seed_valu
 
     remaining_hours = max(duty.hours, 0)
     allocated_slots = []
-    available_days = list(free_slots_by_day.keys())
-    rng.shuffle(available_days)
+    preferred_days = [day for day in duty.preferred_days_list if day in free_slots_by_day]
+    non_preferred_days = [day for day in free_slots_by_day.keys() if day not in preferred_days]
+    rng.shuffle(preferred_days)
+    rng.shuffle(non_preferred_days)
+    day_order = preferred_days + non_preferred_days
 
     # First spread one slot per day to avoid stacking duty hours continuously.
-    for day in list(available_days):
+    for day in day_order:
         if remaining_hours == 0:
             break
 
@@ -76,11 +86,10 @@ def allocate_duty_slots(duty, timetable_grid, days, hours, week_dates, seed_valu
 
     # If duty hours still remain, continue filling the leftover free slots.
     while remaining_hours > 0:
-        candidate_days = [day for day, slots in free_slots_by_day.items() if slots]
+        candidate_days = [day for day in day_order if free_slots_by_day.get(day)]
         if not candidate_days:
             break
 
-        rng.shuffle(candidate_days)
         for day in candidate_days:
             if remaining_hours == 0:
                 break
@@ -93,6 +102,214 @@ def allocate_duty_slots(duty, timetable_grid, days, hours, week_dates, seed_valu
             remaining_hours -= 1
 
     return allocated_slots
+
+
+def get_first_working_week_start(duty):
+    """Return a representative Monday-Friday week where the duty is active."""
+    probe_date = duty.start_date
+    while probe_date <= duty.end_date and probe_date.weekday() > 4:
+        probe_date += timedelta(days=1)
+
+    if probe_date > duty.end_date:
+        return None
+
+    return get_week_start(probe_date)
+
+
+def get_projected_faculty_workload(faculty, academic_year, additional_hours=0):
+    """Calculate projected weekly workload for a faculty in an academic year."""
+    teaching_hours = sum(
+        assignment.subject.hours_per_week
+        for assignment in faculty.assignments
+        if assignment.academic_year == academic_year
+    )
+    active_duty_hours = sum(
+        duty.hours
+        for duty in faculty.duties
+        if duty.academic_year == academic_year and duty.is_active()
+    )
+    return teaching_hours + active_duty_hours + additional_hours
+
+
+def validate_duty_capacity(faculty, duty):
+    """
+    Check whether the duty can fit into the faculty's free timetable hours.
+    """
+    assignments_in_year = Assignment.query.filter_by(
+        faculty_id=faculty.id,
+        academic_year=duty.academic_year
+    ).count()
+    timetable_entries = Timetable.query.filter_by(
+        faculty_id=faculty.id,
+        academic_year=duty.academic_year
+    ).all()
+
+    if assignments_in_year > 0 and not timetable_entries:
+        return (
+            False,
+            f"Generate the timetable for {faculty.name} in {duty.academic_year} before assigning this duty, so free hours can be validated."
+        )
+
+    week_start = get_first_working_week_start(duty)
+    if week_start is None:
+        return (
+            False,
+            f"{duty.duty_name} does not contain any Monday-Friday working day in its date range."
+        )
+
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+    hours = list(range(1, 7))
+    week_dates = {
+        day: week_start + timedelta(days=index)
+        for index, day in enumerate(days)
+    }
+    timetable_grid = {
+        day: {hour: None for hour in hours}
+        for day in days
+    }
+
+    for entry in timetable_entries:
+        timetable_grid[entry.timeslot.day][entry.timeslot.hour] = {'type': 'class'}
+
+    allocated_slots = allocate_duty_slots(
+        duty,
+        timetable_grid,
+        days,
+        hours,
+        week_dates,
+        f"{faculty.id}-{duty.id}-{week_start.isoformat()}"
+    )
+
+    if len(allocated_slots) < duty.hours:
+        return (
+            False,
+            f"Assigning {duty.duty_name} to {faculty.name} would exceed the faculty's free timetable hours."
+        )
+
+    return True, None
+
+
+def render_faculty_timetable_view(faculty):
+    """Render the weekly timetable view for a specific faculty."""
+    academic_year = request.args.get('academic_year') or get_latest_academic_year()
+    requested_week = request.args.get('week_start')
+
+    try:
+        selected_date = datetime.strptime(requested_week, '%Y-%m-%d').date() if requested_week else datetime.utcnow().date()
+    except ValueError:
+        selected_date = datetime.utcnow().date()
+
+    week_start = get_week_start(selected_date)
+    week_dates = {
+        day: week_start + timedelta(days=index)
+        for index, day in enumerate(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])
+    }
+    previous_week = week_start - timedelta(days=7)
+    next_week = week_start + timedelta(days=7)
+    if current_user.role == "admin" and current_user.id != faculty.id:
+        previous_week_url = url_for(
+            'main.faculty_timetable_admin',
+            id=faculty.id,
+            academic_year=academic_year,
+            week_start=previous_week.strftime('%Y-%m-%d')
+        )
+        next_week_url = url_for(
+            'main.faculty_timetable_admin',
+            id=faculty.id,
+            academic_year=academic_year,
+            week_start=next_week.strftime('%Y-%m-%d')
+        )
+    else:
+        previous_week_url = url_for(
+            'main.faculty_timetable',
+            academic_year=academic_year,
+            week_start=previous_week.strftime('%Y-%m-%d')
+        )
+        next_week_url = url_for(
+            'main.faculty_timetable',
+            academic_year=academic_year,
+            week_start=next_week.strftime('%Y-%m-%d')
+        )
+
+    timetable_entries = Timetable.query.filter_by(
+        faculty_id=faculty.id,
+        academic_year=academic_year
+    ).all()
+
+    active_duties = [
+        duty for duty in faculty.duties
+        if duty.faculty_id == faculty.id and duty.overlaps_week(week_start)
+    ]
+
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+    hours = list(range(1, 7))
+    timetable_grid = {
+        day: {hour: None for hour in hours}
+        for day in days
+    }
+
+    for entry in timetable_entries:
+        day = entry.timeslot.day
+        hour = entry.timeslot.hour
+        timetable_grid[day][hour] = {
+            'subject': entry.subject.subject_name,
+            'class': entry.class_obj.class_name,
+            'course_code': entry.subject.course_code,
+            'is_lab': entry.subject.is_lab,
+            'type': 'class'
+        }
+
+    displayed_duties = []
+    allocated_duty_hours = 0
+    for duty in active_duties:
+        allocated_slots = allocate_duty_slots(
+            duty,
+            timetable_grid,
+            days,
+            hours,
+            week_dates,
+            f"{faculty.id}-{duty.id}-{week_start.isoformat()}"
+        )
+
+        if not allocated_slots:
+            continue
+
+        displayed_duties.append(duty)
+        allocated_duty_hours += len(allocated_slots)
+
+        for day, hour in allocated_slots:
+            duty_date = week_dates[day]
+            timetable_grid[day][hour] = {
+                'duty_name': duty.duty_name,
+                'category': duty.category,
+                'hours': duty.hours,
+                'allocated_hours': len(allocated_slots),
+                'type': 'duty',
+                'duty_day': day,
+                'duty_date': duty_date.strftime('%d-%m-%Y'),
+                'start_date': duty.start_date.strftime('%d-%m-%Y'),
+                'end_date': duty.end_date.strftime('%d-%m-%Y')
+            }
+
+    return render_template(
+        'faculty_timetable.html',
+        timetable_grid=timetable_grid,
+        days=days,
+        hours=hours,
+        academic_year=academic_year,
+        faculty_name=faculty.name,
+        active_duties=displayed_duties,
+        total_duty_hours=allocated_duty_hours,
+        teaching_hours=len(timetable_entries),
+        faculty_max_workload=faculty.max_workload,
+        week_start=week_start,
+        week_end=week_start + timedelta(days=4),
+        week_dates=week_dates,
+        previous_week=previous_week,
+        next_week=next_week,
+        previous_week_url=previous_week_url,
+        next_week_url=next_week_url
+    )
 
 @main.route('/')
 def home():
@@ -112,7 +329,8 @@ def login():
             login_user(faculty)
             return redirect(url_for('main.dashboard'))
 
-        return "Invalid Credentials"
+        flash("Invalid credentials. Please check your email and password.", "danger")
+        return redirect(url_for('main.login'))
 
     return render_template("login.html")
 
@@ -133,12 +351,20 @@ def dashboard():
         total_subjects = Subject.query.count()
         total_assignments = Assignment.query.count()
         total_duties = AdditionalDuty.query.count()
+        assigned_duty_count = AdditionalDuty.query.filter(AdditionalDuty.faculty_id.isnot(None)).count()
+        overloaded_faculty = []
 
-        overloaded_count = 0
-        all_faculty = Faculty.query.all()
-        for faculty in all_faculty:
-            if faculty.calculate_total_workload(reference_date) > faculty.max_workload:
-                overloaded_count += 1
+        for faculty in Faculty.query.all():
+            total_workload = faculty.calculate_total_workload(reference_date)
+            if total_workload > faculty.max_workload:
+                overloaded_faculty.append({
+                    'id': faculty.id,
+                    'name': faculty.name,
+                    'total_workload': total_workload,
+                    'max_workload': faculty.max_workload
+                })
+
+        overloaded_faculty_names = ",".join(item['name'] for item in overloaded_faculty)
 
         return render_template(
             "dashboard.html",
@@ -148,8 +374,10 @@ def dashboard():
             total_faculty=total_faculty,
             total_subjects=total_subjects,
             total_assignments=total_assignments,
-            overloaded_count=overloaded_count,
-            total_duties=total_duties
+            total_duties=total_duties,
+            assigned_duty_count=assigned_duty_count,
+            overloaded_faculty=overloaded_faculty,
+            overloaded_faculty_names=overloaded_faculty_names
         )
     else:
         # FACULTY VIEW
@@ -239,14 +467,30 @@ def assign_subject():
         class_id = request.form.get('class_id')
         academic_year = request.form.get('academic_year')
         
+        faculty = Faculty.query.get(int(faculty_id))
         subject = Subject.query.get(int(subject_id))
         class_obj = Class.query.get(int(class_id))
         
-        if not subject or not class_obj:
-            return "Subject or class not found!"
+        if not faculty or not subject or not class_obj:
+            flash("Faculty, subject, or class not found.", "danger")
+            return redirect(url_for('main.assign_subject'))
 
         if subject.semester != class_obj.semester:
-            return "Subject semester must match the selected class semester!"
+            flash("Subject semester must match the selected class semester.", "danger")
+            return redirect(url_for('main.assign_subject'))
+
+        class_subject_assignment = Assignment.query.filter_by(
+            subject_id=int(subject_id),
+            class_id=int(class_id),
+            academic_year=academic_year
+        ).first()
+
+        if class_subject_assignment:
+            flash(
+                f"{subject.subject_name} is already assigned to {class_subject_assignment.faculty.name} for {class_obj.class_name}.",
+                "danger"
+            )
+            return redirect(url_for('main.assign_subject'))
 
         existing = Assignment.query.filter_by(
             faculty_id=int(faculty_id),
@@ -256,7 +500,23 @@ def assign_subject():
         ).first()
 
         if existing:
-            return "This subject is already assigned to this faculty for this class in this academic year!"
+            flash(
+                "This subject is already assigned to this faculty for this class in this academic year.",
+                "warning"
+            )
+            return redirect(url_for('main.assign_subject'))
+
+        projected_total = get_projected_faculty_workload(
+            faculty,
+            academic_year,
+            additional_hours=subject.hours_per_week
+        )
+        if projected_total > faculty.max_workload:
+            flash(
+                f"Faculty workload overloaded for {faculty.name}. Try another faculty.",
+                "danger"
+            )
+            return redirect(url_for('main.assign_subject'))
 
         assignment = Assignment(
             faculty_id=int(faculty_id),
@@ -270,6 +530,16 @@ def assign_subject():
         db.session.add(assignment)
         db.session.commit()
 
+        timetable_result = generate_timetable(subject.semester, academic_year)
+        if not timetable_result.get('success'):
+            flash(
+                f"Subject assigned, but timetable refresh failed for semester {subject.semester}, "
+                f"{academic_year}: {timetable_result.get('message')}",
+                "warning"
+            )
+            return redirect(url_for('main.assign_subject'))
+
+        flash(f"Subject assigned successfully to {faculty.name}.", "success")
         return redirect(url_for('main.dashboard'))
     
     return render_template("assign_subject.html", subjects=subjects, faculties=faculties, classes=classes)
@@ -308,15 +578,19 @@ def add_faculty():
 
     return render_template("add_faculty.html")
 
-@main.route('/delete-assignment/<int:id>')
+@main.route('/delete-assignment/<int:id>', methods=['GET', 'POST'])
 @login_required
 def delete_assignment(id):
     if current_user.role != "admin":
         return "Access Denied: Admins Only"
 
     assignment = Assignment.query.get_or_404(id)
+    semester = assignment.semester
+    academic_year = assignment.academic_year
     db.session.delete(assignment)
     db.session.commit()
+
+    generate_timetable(semester, academic_year)
 
     return redirect(url_for('main.dashboard'))
 
@@ -461,28 +735,48 @@ def add_duty():
         duty_name = request.form.get('duty_name')
         category = request.form.get('category')
         duration_type = request.form.get('duration_type')
-        duty_day = request.form.get('duty_day')
+        preferred_days = request.form.getlist('preferred_days')
         hours = request.form.get('hours')
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
         academic_year = request.form.get('academic_year')
         
-        from datetime import datetime
         try:
-            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
-        except ValueError:
-            return "Invalid date format. Use YYYY-MM-DD"
+            duty_hours = int(hours)
+        except (TypeError, ValueError):
+            flash("Hours per week must be a valid number.", "danger")
+            return redirect(url_for('main.add_duty'))
+
+        try:
+            if duration_type == 'Yearly':
+                start_date_obj, end_date_obj = get_academic_year_date_range(academic_year)
+            elif duration_type == 'Weekly':
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                if start_date_obj.weekday() != 0:
+                    flash("For weekly duties, select a Monday as the start date.", "danger")
+                    return redirect(url_for('main.add_duty'))
+                end_date_obj = start_date_obj + timedelta(days=6)
+            else:
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except (TypeError, ValueError):
+            flash("Invalid date format. Use YYYY-MM-DD.", "danger")
+            return redirect(url_for('main.add_duty'))
         
         if start_date_obj >= end_date_obj:
-            return "End date must be after start date!"
+            flash("End date must be after start date.", "danger")
+            return redirect(url_for('main.add_duty'))
+
+        if len(preferred_days) > duty_hours:
+            flash("Preferred days cannot be more than hours per week.", "danger")
+            return redirect(url_for('main.add_duty'))
         
         duty = AdditionalDuty(
             duty_name=duty_name,
             category=category,
             duration_type=duration_type,
-            hours=int(hours),
-            duty_day=duty_day,
+            hours=duty_hours,
+            duty_day=",".join(preferred_days),
             start_date=start_date_obj,
             end_date=end_date_obj,
             academic_year=academic_year
@@ -491,6 +785,7 @@ def add_duty():
         db.session.add(duty)
         db.session.commit()
         
+        flash("Duty added successfully.", "success")
         return redirect(url_for('main.dashboard'))
     
     return render_template("add_duty.html")
@@ -514,7 +809,8 @@ def assign_duty():
         duty = AdditionalDuty.query.get(int(duty_id))
         
         if not faculty or not duty:
-            return "Faculty or Duty not found!"
+            flash("Faculty or duty not found.", "danger")
+            return redirect(url_for('main.assign_duty'))
         
         # Check if faculty already has this duty assigned
         existing = AdditionalDuty.query.filter_by(
@@ -524,12 +820,19 @@ def assign_duty():
         ).first()
         
         if existing and existing.id != int(duty_id):
-            return "This duty is already assigned to this faculty for this period!"
+            flash("This duty is already assigned to this faculty for this period.", "warning")
+            return redirect(url_for('main.assign_duty'))
+
+        is_valid, validation_message = validate_duty_capacity(faculty, duty)
+        if not is_valid:
+            flash(validation_message, "danger")
+            return redirect(url_for('main.assign_duty'))
         
         # Assign the duty to faculty
         duty.faculty_id = int(faculty_id)
         db.session.commit()
         
+        flash(f"Duty assigned successfully to {faculty.name}.", "success")
         return redirect(url_for('main.dashboard'))
     
     return render_template("assign_duty.html", faculties=faculties, duties=duties)
@@ -552,7 +855,7 @@ def duty_list():
             'faculty_name': duty.faculty.name if duty.faculty_id else 'Unassigned',
             'category': duty.category,
             'duration_type': duty.duration_type,
-            'duty_day': duty.duty_day,
+            'duty_day': duty.preferred_days_display,
             'hours': duty.hours,
             'start_date': duty.start_date.strftime('%Y-%m-%d'),
             'end_date': duty.end_date.strftime('%Y-%m-%d'),
@@ -562,6 +865,44 @@ def duty_list():
         })
     
     return render_template("duty_list.html", duty_data=duty_data, reference_date=reference_date)
+
+
+@main.route('/duty-assigned-list')
+@login_required
+def duty_assigned_list():
+    if current_user.role != "admin":
+        return "Access Denied: Admins Only"
+
+    reference_date = get_reference_date()
+    overloaded_faculty_names = request.args.get('overloaded_faculty')
+    if overloaded_faculty_names:
+        flash(
+            f"Please reduce work for: {overloaded_faculty_names.replace(',', ', ')}.",
+            "warning"
+        )
+
+    duties = AdditionalDuty.query.filter(AdditionalDuty.faculty_id.isnot(None)).all()
+
+    duty_data = []
+    for duty in duties:
+        duty_data.append({
+            'duty': duty,
+            'faculty_name': duty.faculty.name,
+            'category': duty.category,
+            'duration_type': duty.duration_type,
+            'duty_day': duty.preferred_days_display,
+            'hours': duty.hours,
+            'start_date': duty.start_date.strftime('%Y-%m-%d'),
+            'end_date': duty.end_date.strftime('%Y-%m-%d'),
+            'is_active': duty.is_active(reference_date),
+            'academic_year': duty.academic_year
+        })
+
+    return render_template(
+        "duty_assigned_list.html",
+        duty_data=duty_data,
+        reference_date=reference_date
+    )
 
 
 @main.route('/delete-duty/<int:id>', methods=['POST'])
@@ -627,105 +968,18 @@ def my_profile():
 @login_required
 def faculty_timetable():
     """Display the logged-in faculty member's weekly timetable"""
-    # Get academic year from query string (default to latest available year)
-    academic_year = request.args.get('academic_year') or get_latest_academic_year()
-    requested_week = request.args.get('week_start')
+    return render_faculty_timetable_view(current_user)
 
-    try:
-        selected_date = datetime.strptime(requested_week, '%Y-%m-%d').date() if requested_week else datetime.utcnow().date()
-    except ValueError:
-        selected_date = datetime.utcnow().date()
 
-    week_start = get_week_start(selected_date)
-    week_dates = {
-        day: week_start + timedelta(days=index)
-        for index, day in enumerate(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])
-    }
-    previous_week = week_start - timedelta(days=7)
-    next_week = week_start + timedelta(days=7)
-    
-    # Get faculty's timetable entries
-    timetable_entries = Timetable.query.filter_by(
-        faculty_id=current_user.id,
-        academic_year=academic_year
-    ).all()
-    
-    # Get duties active in the displayed week
-    active_duties = [
-        duty for duty in current_user.duties
-        if duty.faculty_id == current_user.id and duty.overlaps_week(week_start)
-    ]
-    
-    # Organize timetable by day and hour
-    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-    hours = list(range(1, 7))
-    
-    # Create a 2D grid: grid[day][hour] = timetable entry
-    timetable_grid = {}
-    for day in days:
-        timetable_grid[day] = {}
-        for hour in hours:
-            timetable_grid[day][hour] = None
-    
-    # Fill the grid with timetable data
-    for entry in timetable_entries:
-        day = entry.timeslot.day
-        hour = entry.timeslot.hour
-        timetable_grid[day][hour] = {
-            'subject': entry.subject.subject_name,
-            'class': entry.class_obj.class_name,
-            'course_code': entry.subject.course_code,
-            'is_lab': entry.subject.is_lab,
-            'type': 'class'
-        }
-    
-    displayed_duties = []
+@main.route('/faculty/<int:id>/timetable')
+@login_required
+def faculty_timetable_admin(id):
+    """Display a faculty member's timetable for admins."""
+    if current_user.role != "admin":
+        return "Access Denied: Admins Only"
 
-    # Spread duties across free slots in the displayed week.
-    for duty in active_duties:
-        allocated_slots = allocate_duty_slots(
-            duty,
-            timetable_grid,
-            days,
-            hours,
-            week_dates,
-            f"{current_user.id}-{duty.id}-{week_start.isoformat()}"
-        )
-
-        if not allocated_slots:
-            continue
-
-        displayed_duties.append(duty)
-
-        for day, hour in allocated_slots:
-            duty_date = week_dates[day]
-            timetable_grid[day][hour] = {
-                'duty_name': duty.duty_name,
-                'category': duty.category,
-                'hours': duty.hours,
-                'type': 'duty',
-                'duty_day': day,
-                'duty_date': duty_date.strftime('%d-%m-%Y'),
-                'start_date': duty.start_date.strftime('%d-%m-%Y'),
-                'end_date': duty.end_date.strftime('%d-%m-%Y')
-            }
-    
-    return render_template(
-        'faculty_timetable.html',
-        timetable_grid=timetable_grid,
-        days=days,
-        hours=hours,
-        academic_year=academic_year,
-        faculty_name=current_user.name,
-        active_duties=displayed_duties,
-        total_duty_hours=sum([d.hours for d in displayed_duties]),
-        teaching_hours=len(timetable_entries),
-        week_start=week_start,
-        week_end=week_start + timedelta(days=4),
-        week_dates=week_dates,
-        previous_week=previous_week,
-        next_week=next_week
-    )
+    faculty = Faculty.query.get_or_404(id)
+    return render_faculty_timetable_view(faculty)
 
 
 @main.route('/class/<int:class_id>/timetable')

@@ -231,7 +231,7 @@
                     <th>📋 Duty Name</th>
                     <th>🏷️ Category</th>
                     <th>⏱️ Hours/Week</th>
-                    <th>🗓️ Duty Day</th>
+                    <th>🗓️ Preferred Days</th>
                     <th>📅 Academic Year</th>
                 </tr>
             </thead>
@@ -241,7 +241,7 @@
                     <td><strong>{{ duty.duty_name }}</strong></td>
                     <td><span class="badge bg-secondary">{{ duty.category }}</span></td>
                     <td><span class="badge bg-info">{{ duty.hours }}</span></td>
-                    <td><span class="badge bg-warning text-dark">{{ duty.duty_day or '-' }}</span></td>
+                    <td><span class="badge bg-warning text-dark">{{ duty.preferred_days_display }}</span></td>
                     <td><span class="badge bg-primary">{{ duty.academic_year }}</span></td>
                 </tr>
                 {% endfor %}

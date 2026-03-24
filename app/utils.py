@@ -3,9 +3,10 @@ Utility functions for Faculty Workload Management System
 """
 
 from app import db
-from app.models import TimeSlot, Class, Timetable, Assignment
+from app.models import TimeSlot, Class, Timetable, Assignment, AdditionalDuty
 
-MAX_DAILY_HOURS = 4
+MAX_DAILY_HOURS = 3
+TOTAL_SLOTS_PER_DAY = 6
 
 
 def create_timeslots():
@@ -56,6 +57,17 @@ def get_daily_scheduled_hours(academic_year, day, class_id=None, faculty_id=None
     return sum(1 for timetable in query.all() if timetable.timeslot.day == day)
 
 
+def get_daily_duty_hours(academic_year, day, faculty_id):
+    """Get the number of duty hours for a faculty on a specific day."""
+    duties = AdditionalDuty.query.filter_by(
+        faculty_id=faculty_id,
+        academic_year=academic_year
+    ).all()
+    
+    # Count only duties explicitly placed on the given weekday.
+    return sum(duty.hours for duty in duties if day in duty.preferred_days_list)
+
+
 def get_available_slots(class_id, faculty_id, academic_year, day=None, max_daily_hours=MAX_DAILY_HOURS):
     """
     Get available timeslots for a class and faculty combination
@@ -70,18 +82,21 @@ def get_available_slots(class_id, faculty_id, academic_year, day=None, max_daily
     available = []
     
     for slot in all_slots:
-        class_daily_hours = get_daily_scheduled_hours(
-            academic_year,
-            slot.day,
-            class_id=class_id
-        )
         faculty_daily_hours = get_daily_scheduled_hours(
             academic_year,
             slot.day,
             faculty_id=faculty_id
         )
 
-        if class_daily_hours >= max_daily_hours or faculty_daily_hours >= max_daily_hours:
+        # Faculty teaching load is capped per day.
+        if faculty_daily_hours >= max_daily_hours:
+            continue
+
+        # Check physical capacity constraint (Teaching + Duties <= Total Slots)
+        # If faculty has duties on this day, ensure we don't overbook beyond the day's capacity
+        faculty_duty_hours = get_daily_duty_hours(academic_year, slot.day, faculty_id)
+        # If current teaching + new slot (1) + duties > total available slots (6)
+        if faculty_daily_hours + 1 + faculty_duty_hours > TOTAL_SLOTS_PER_DAY:
             continue
 
         # Check if class already has a subject at this time
@@ -132,11 +147,7 @@ def find_continuous_slots(class_id, faculty_id, academic_year, duration, day=Non
         days = [day]
     
     for target_day in days:
-        class_daily_hours = get_class_workload_today(class_id, academic_year, target_day)
         faculty_daily_hours = get_faculty_workload_today(faculty_id, academic_year, target_day)
-
-        if class_daily_hours + duration > max_daily_hours:
-            continue
 
         if faculty_daily_hours + duration > max_daily_hours:
             continue
@@ -202,6 +213,25 @@ def get_faculty_weekly_hours(faculty_id, academic_year):
     ).count()
 
 
+def get_balanced_day_order(class_id, faculty_id, academic_year, days, seed_value):
+    """
+    Prefer days with lighter existing load so work is spread across the week.
+    """
+    seeded_offsets = {
+        day: (sum(ord(char) for char in f"{seed_value}-{day}") % len(days))
+        for day in days
+    }
+
+    return sorted(
+        days,
+        key=lambda day: (
+            get_faculty_workload_today(faculty_id, academic_year, day),
+            get_class_workload_today(class_id, academic_year, day),
+            seeded_offsets[day]
+        )
+    )
+
+
 def generate_timetable(semester, academic_year):
     """
     Automatically generate timetable based on assignments
@@ -212,7 +242,8 @@ def generate_timetable(semester, academic_year):
     3. For each class, get assignments
     4. Schedule lab subjects first (need continuous 3 hours)
     5. Schedule theory subjects (distribute across week)
-    6. Check constraints: faculty availability, workload, and max 4 periods/day
+    6. Check constraints: faculty availability, workload, max 3 periods/day,
+       and balanced distribution across the week
     
     Args:
         semester (int): Semester number (1-8)
@@ -331,20 +362,30 @@ def generate_timetable(semester, academic_year):
                 
                 # Try to distribute across different days
                 days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-                day_index = 0
-                
-                while hours_scheduled < hours_needed and day_index < len(days) * 2:
-                    current_day = days[day_index % len(days)]
-                    available = get_available_slots(
+                attempts = 0
+
+                while hours_scheduled < hours_needed and attempts < len(days) * hours_needed:
+                    ordered_days = get_balanced_day_order(
                         class_obj.id,
                         faculty.id,
                         academic_year,
-                        current_day,
-                        max_daily_hours=MAX_DAILY_HOURS
+                        days,
+                        f"{class_obj.id}-{faculty.id}-{subject.id}-{hours_scheduled}"
                     )
-                    
-                    if available:
-                        # Schedule one hour on this day
+                    scheduled_this_round = False
+
+                    for current_day in ordered_days:
+                        available = get_available_slots(
+                            class_obj.id,
+                            faculty.id,
+                            academic_year,
+                            current_day,
+                            max_daily_hours=MAX_DAILY_HOURS
+                        )
+
+                        if not available:
+                            continue
+
                         created = schedule_subject(
                             class_obj.id,
                             subject.id,
@@ -353,10 +394,17 @@ def generate_timetable(semester, academic_year):
                             semester,
                             [available[0]]
                         )
-                        total_timetables += created
-                        hours_scheduled += 1
-                    
-                    day_index += 1
+
+                        if created:
+                            total_timetables += created
+                            hours_scheduled += 1
+                            scheduled_this_round = True
+                            break
+
+                    if not scheduled_this_round:
+                        break
+
+                    attempts += 1
                 
                 if hours_scheduled == hours_needed:
                     successful_assignments.append(

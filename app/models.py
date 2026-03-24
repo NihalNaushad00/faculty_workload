@@ -12,7 +12,7 @@ class Faculty(UserMixin, db.Model):
     designation = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    max_workload = db.Column(db.Integer, default=16)
+    max_workload = db.Column(db.Integer, default=20)
     role = db.Column(db.String(20), default="faculty")
 
     assignments = db.relationship(
@@ -139,6 +139,17 @@ class AdditionalDuty(db.Model):
     end_date = db.Column(db.Date, nullable=False)  # When duty ends
     academic_year = db.Column(db.String(20), nullable=False)  # e.g., "2025-26"
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def preferred_days_list(self):
+        if not self.duty_day:
+            return []
+        return [day.strip() for day in self.duty_day.split(',') if day.strip()]
+
+    @property
+    def preferred_days_display(self):
+        days = self.preferred_days_list
+        return ", ".join(days) if days else "Random"
     
     def is_active(self, reference_date=None):
         """Check if duty is active for a given date."""
@@ -155,7 +166,8 @@ class AdditionalDuty(db.Model):
         if not self.is_active(target_date):
             return False
 
-        if self.duty_day and self.duty_day != target_date.strftime('%A'):
+        preferred_days = self.preferred_days_list
+        if preferred_days and target_date.strftime('%A') not in preferred_days:
             return False
 
         return True
