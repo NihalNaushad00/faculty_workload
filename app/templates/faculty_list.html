@@ -17,6 +17,19 @@
     </div>
 </div>
 
+<div class="faculty-card mb-4">
+    <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label for="referenceDate" class="form-label"><strong>🗓️ Reference Date</strong></label>
+            <input type="date" class="form-control" id="referenceDate" name="reference_date" value="{{ reference_date.strftime('%Y-%m-%d') }}">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Apply</button>
+        </div>
+    </form>
+    <small class="text-muted d-block mt-2">Faculty workload values below are calculated for {{ reference_date.strftime('%d %b %Y') }}.</small>
+</div>
+
 <div class="faculty-card">
     <div class="table-responsive">
         <table class="table table-striped table-hover">

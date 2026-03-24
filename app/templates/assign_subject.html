@@ -41,8 +41,15 @@
         </div>
 
         <div class="mb-4">
-            <label for="classDivision" class="form-label">🏫 Class/Division/Section</label>
-            <input type="text" id="classDivision" name="class_division" class="form-control" required placeholder="e.g., A, B, S1-A, S2-B, Div-A">
+            <label for="classId" class="form-label">🏫 Select Class</label>
+            <select class="form-select" id="classId" name="class_id" required>
+                <option value="">Choose a class...</option>
+                {% for class_obj in classes %}
+                    <option value="{{ class_obj.id }}">
+                        {{ class_obj.class_name }} ({{ class_obj.department }}, Sem {{ class_obj.semester }})
+                    </option>
+                {% endfor %}
+            </select>
         </div>
 
         <div class="mb-4">

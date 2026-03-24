@@ -159,6 +159,21 @@
     </div>
 </div>
 
+<div class="profile-container">
+    <div class="profile-card">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label for="referenceDate" class="form-label"><strong>🗓️ Reference Date</strong></label>
+                <input type="date" class="form-control" id="referenceDate" name="reference_date" value="{{ reference_date.strftime('%Y-%m-%d') }}">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Apply</button>
+            </div>
+        </form>
+        <small class="text-muted d-block mt-2">Duty hours and active-duty tables below are calculated for {{ reference_date.strftime('%d %b %Y') }}.</small>
+    </div>
+</div>
+
 <!-- Profile Information Card -->
 <div class="profile-container">
     <div class="profile-card">
@@ -252,6 +267,93 @@
                 <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">❌ Cancel</a>
             </div>
         </form>
+    </div>
+
+    <!-- Workload Breakdown -->
+    <div class="profile-card">
+        <h4>📊 Workload Breakdown</h4>
+        <div class="profile-info-grid">
+            <div class="info-item">
+                <label>📚 Teaching Hours</label>
+                <div class="value">{{ teaching_hours }} hrs/week</div>
+            </div>
+            <div class="info-item">
+                <label>🔧 Active Duty Hours</label>
+                <div class="value">{{ duty_hours }} hrs/week</div>
+            </div>
+            <div class="info-item">
+                <label>⚡ Total Workload</label>
+                <div class="value">{{ total_workload }} / {{ current_user.max_workload }} hrs</div>
+            </div>
+            <div class="info-item">
+                <label>📈 Workload %</label>
+                <div class="value">
+                    {% if workload_percentage > 100 %}
+                        <span class="badge bg-danger">{{ "%.1f"|format(workload_percentage) }}%</span>
+                    {% elif workload_percentage > 80 %}
+                        <span class="badge bg-warning">{{ "%.1f"|format(workload_percentage) }}%</span>
+                    {% else %}
+                        <span class="badge bg-success">{{ "%.1f"|format(workload_percentage) }}%</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Duties Section -->
+    <div class="profile-card">
+        <h4>🔧 Active Duties</h4>
+        
+        {% if active_duties|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Duty Name</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th>Hours/Week</th>
+                        <th>Duty Day</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for duty in active_duties %}
+                    <tr>
+                        <td><strong>{{ duty.duty_name }}</strong></td>
+                        <td>
+                            <span class="badge bg-primary">{{ duty.category }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ duty.duration_type }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ duty.hours }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-warning text-dark">{{ duty.duty_day or '-' }}</span>
+                        </td>
+                        <td>{{ duty.start_date.strftime('%d-%b-%Y') }}</td>
+                        <td>{{ duty.end_date.strftime('%d-%b-%Y') }}</td>
+                        <td>
+                            {% if duty.is_active(reference_date) %}
+                                <span class="badge bg-success">✅ Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">❌ Inactive</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <strong>ℹ️ No Active Duties:</strong> You currently have no active duties assigned.
+        </div>
+        {% endif %}
     </div>
 </div>
 

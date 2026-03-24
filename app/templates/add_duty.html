@@ -62,6 +62,19 @@
         </div>
 
         <div class="mb-4">
+            <label for="dutyDay" class="form-label">🗓️ Duty Day</label>
+            <select id="dutyDay" name="duty_day" class="form-select" required>
+                <option value="">Select Day</option>
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+            </select>
+            <small class="text-muted">The duty will appear only on this day in the weekly timetable.</small>
+        </div>
+
+        <div class="mb-4">
             <label for="academicYear" class="form-label">📅 Academic Year</label>
             <select id="academicYear" name="academic_year" class="form-select" required>
                 <option value="">Select Year</option>
@@ -117,4 +130,3 @@
         updateDateLabels();
     });
 </script>
-

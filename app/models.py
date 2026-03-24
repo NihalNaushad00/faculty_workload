@@ -40,10 +40,26 @@ class Faculty(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-    def calculate_total_workload(self):
-        subject_hours = sum([a.subject.hours_per_week for a in self.assignments])
-        duty_hours = sum([d.hours for d in self.duties])
-        return subject_hours + duty_hours
+    def get_active_duties(self, reference_date=None):
+        """Get only duties active on the given date."""
+        return [
+            d for d in self.duties
+            if d.faculty_id == self.id and d.is_active(reference_date)
+        ]
+    
+    def calculate_teaching_hours(self):
+        """Calculate total teaching hours from all assignments (includes multi-class teaching)"""
+        return sum([a.subject.hours_per_week for a in self.assignments])
+    
+    def calculate_duty_hours(self, reference_date=None):
+        """Calculate total duty hours active on the given date."""
+        return sum([d.hours for d in self.get_active_duties(reference_date)])
+
+    def calculate_total_workload(self, reference_date=None):
+        """Calculate total workload: teaching + duties active on the given date."""
+        teaching_hours = self.calculate_teaching_hours()
+        duty_hours = self.calculate_duty_hours(reference_date)
+        return teaching_hours + duty_hours
 
 # -----------------------
 # Subject Table
@@ -74,7 +90,7 @@ class Assignment(db.Model):
         db.UniqueConstraint(
             'faculty_id',
             'subject_id',
-            'class_division',
+            'class_id',
             'academic_year',
             name='unique_faculty_subject_class_year'
         ),
@@ -82,13 +98,22 @@ class Assignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     faculty_id = db.Column(db.Integer, db.ForeignKey('faculty.id'), nullable=False)
     subject_id = db.Column(db.Integer, db.ForeignKey('subject.id'), nullable=False)
-    class_division = db.Column(db.String(20), nullable=False)  # e.g., "A", "B", "S1-A", "S2-B"
+    class_id = db.Column(db.Integer, db.ForeignKey('class.id'), nullable=True)
+    class_division = db.Column(db.String(20), nullable=True)  # Legacy compatibility for older rows
     semester = db.Column(db.Integer, nullable=False)  # Inherited from subject but stored for reference
     academic_year = db.Column(db.String(20), nullable=False)  # e.g., "2025-26"
     assigned_date = db.Column(db.DateTime, default=datetime.utcnow)
 
+    class_obj = db.relationship('Class', backref='assignments')
+
+    @property
+    def class_name(self):
+        if self.class_obj:
+            return self.class_obj.class_name
+        return self.class_division or "Unassigned Class"
+
     def __repr__(self):
-        return f'<Assignment {self.faculty_id} -> {self.subject_id} ({self.class_division})>'
+        return f'<Assignment {self.faculty_id} -> {self.subject_id} ({self.class_name})>'
 
 
 # -----------------------
@@ -109,15 +134,31 @@ class AdditionalDuty(db.Model):
     category = db.Column(db.String(50), nullable=False)  # 'Leadership' (HOD/Placement Officer), 'Exam', 'Administrative', 'Research'
     duration_type = db.Column(db.String(20), nullable=False)  # 'Yearly' or 'Weekly' or 'Custom'
     hours = db.Column(db.Integer, nullable=False)  # Hours per week
+    duty_day = db.Column(db.String(20), nullable=True)  # Monday-Friday
     start_date = db.Column(db.Date, nullable=False)  # When duty starts
     end_date = db.Column(db.Date, nullable=False)  # When duty ends
     academic_year = db.Column(db.String(20), nullable=False)  # e.g., "2025-26"
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    def is_active(self):
-        """Check if duty is currently active"""
-        today = datetime.utcnow().date()
-        return self.start_date <= today <= self.end_date
+    def is_active(self, reference_date=None):
+        """Check if duty is active for a given date."""
+        target_date = reference_date or datetime.utcnow().date()
+        return self.start_date <= target_date <= self.end_date
+
+    def overlaps_week(self, week_start):
+        """Check if duty overlaps the displayed Monday-Friday week."""
+        week_end = week_start + timedelta(days=4)
+        return self.start_date <= week_end and self.end_date >= week_start
+
+    def occurs_on_date(self, target_date):
+        """Check if the duty should appear on a specific calendar date."""
+        if not self.is_active(target_date):
+            return False
+
+        if self.duty_day and self.duty_day != target_date.strftime('%A'):
+            return False
+
+        return True
     
     def duration_days(self):
         """Get total duration in days"""

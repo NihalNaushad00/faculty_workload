@@ -3,8 +3,7 @@ Utility functions for Faculty Workload Management System
 """
 
 from app import db
-from app.models import TimeSlot, Class, Timetable, Assignment, Faculty
-from datetime import datetime
+from app.models import TimeSlot, Class, Timetable, Assignment
 
 
 def create_timeslots():
@@ -25,7 +24,24 @@ def create_timeslots():
     return created_count
 
 
-def get_available_slots(class_id, faculty_id, day=None):
+def assignment_matches_class(assignment, class_obj):
+    """Return True when an assignment belongs to the given class."""
+    if assignment.class_id:
+        return assignment.class_id == class_obj.id
+
+    if not assignment.class_division:
+        return False
+
+    assignment_division = assignment.class_division.strip().upper()
+    class_name = class_obj.class_name.strip().upper()
+
+    if assignment_division == class_name:
+        return True
+
+    return class_name.endswith(f"-{assignment_division}")
+
+
+def get_available_slots(class_id, faculty_id, academic_year, day=None):
     """
     Get available timeslots for a class and faculty combination
     Optionally filter by specific day
@@ -42,13 +58,15 @@ def get_available_slots(class_id, faculty_id, day=None):
         # Check if class already has a subject at this time
         class_conflict = Timetable.query.filter_by(
             class_id=class_id,
-            timeslot_id=slot.id
+            timeslot_id=slot.id,
+            academic_year=academic_year
         ).first()
         
         # Check if faculty is already scheduled at this time
         faculty_conflict = Timetable.query.filter_by(
             faculty_id=faculty_id,
-            timeslot_id=slot.id
+            timeslot_id=slot.id,
+            academic_year=academic_year
         ).first()
         
         if not class_conflict and not faculty_conflict:
@@ -57,19 +75,22 @@ def get_available_slots(class_id, faculty_id, day=None):
     return available
 
 
-def get_faculty_workload_today(faculty_id, day):
+def get_faculty_workload_today(faculty_id, academic_year, day):
     """Get current hours scheduled for a faculty on a specific day"""
-    timetables = Timetable.query.filter_by(faculty_id=faculty_id).all()
+    timetables = Timetable.query.filter_by(
+        faculty_id=faculty_id,
+        academic_year=academic_year
+    ).all()
     hours = 0
     
     for tt in timetables:
         if tt.timeslot.day == day:
-            hours += tt.subject.hours_per_week  # This is approximate
+            hours += 1
     
     return hours
 
 
-def find_continuous_slots(class_id, faculty_id, duration, day=None):
+def find_continuous_slots(class_id, faculty_id, academic_year, duration, day=None):
     """
     Find continuous available slots for lab subjects
     duration: number of continuous hours needed (e.g., 3 for labs)
@@ -79,7 +100,7 @@ def find_continuous_slots(class_id, faculty_id, duration, day=None):
         days = [day]
     
     for target_day in days:
-        available = get_available_slots(class_id, faculty_id, target_day)
+        available = get_available_slots(class_id, faculty_id, academic_year, target_day)
         available.sort(key=lambda x: x.hour)
         
         # Try to find continuous slots
@@ -106,7 +127,8 @@ def schedule_subject(class_id, subject_id, faculty_id, academic_year, semester, 
             class_id=class_id,
             subject_id=subject_id,
             faculty_id=faculty_id,
-            timeslot_id=slot.id
+            timeslot_id=slot.id,
+            academic_year=academic_year
         ).first()
         
         if not existing:
@@ -127,16 +149,10 @@ def schedule_subject(class_id, subject_id, faculty_id, academic_year, semester, 
 
 def get_faculty_weekly_hours(faculty_id, academic_year):
     """Get total weekly hours for a faculty"""
-    timetables = Timetable.query.filter_by(
+    return Timetable.query.filter_by(
         faculty_id=faculty_id,
         academic_year=academic_year
-    ).all()
-    
-    total_hours = 0
-    for tt in timetables:
-        total_hours += tt.subject.hours_per_week
-    
-    return total_hours
+    ).count()
 
 
 def generate_timetable(semester, academic_year):
@@ -176,17 +192,21 @@ def generate_timetable(semester, academic_year):
         total_timetables = 0
         failed_assignments = []
         successful_assignments = []
+        assignments = Assignment.query.filter_by(
+            semester=semester,
+            academic_year=academic_year
+        ).all()
         
+        # Start clean for the target semester/year so a regenerated timetable
+        # does not inherit stale entries from an earlier attempt.
+        clear_timetable(semester, academic_year)
+
         # Process each class
         for class_obj in classes:
-            # Get all assignments for this class
-            # Assignments are based on faculty-subject-class_division
-            assignments = Assignment.query.filter_by(
-                academic_year=academic_year
-            ).all()
-            
-            # Filter assignments that match this class semester
-            class_assignments = [a for a in assignments if a.semester == semester]
+            class_assignments = [
+                assignment for assignment in assignments
+                if assignment_matches_class(assignment, class_obj)
+            ]
             
             if not class_assignments:
                 continue
@@ -208,20 +228,22 @@ def generate_timetable(semester, academic_year):
                     )
                     continue
                 
-                # For labs, we need 3 continuous hours
+                # Labs should occupy one continuous block based on configured hours.
                 # Try to find by day
                 allocated = False
                 days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+                required_duration = max(subject.hours_per_week, 1)
                 
                 for attempt_day in days:
                     continuous_slots = find_continuous_slots(
                         class_obj.id,
                         faculty.id,
-                        3,  # 3 hours for lab
+                        academic_year,
+                        required_duration,
                         attempt_day
                     )
                     
-                    if continuous_slots and len(continuous_slots) == 3:
+                    if continuous_slots and len(continuous_slots) == required_duration:
                         created = schedule_subject(
                             class_obj.id,
                             subject.id,
@@ -268,6 +290,7 @@ def generate_timetable(semester, academic_year):
                     available = get_available_slots(
                         class_obj.id,
                         faculty.id,
+                        academic_year,
                         current_day
                     )
                     

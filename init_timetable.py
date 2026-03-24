@@ -39,6 +39,11 @@ def init_timetable_data():
         
         # Create Classes
         print("\n🏫 Creating Classes...")
+        department_codes = {
+            'Computer Science': 'CSE',
+            'Electronics': 'ECE',
+            'Mechanical': 'ME',
+        }
         departments = {
             'Computer Science': [1, 3, 5, 7],
             'Electronics': [1, 3, 5, 7],
@@ -48,9 +53,10 @@ def init_timetable_data():
         classes = []
         class_count = 0
         for dept, semesters in departments.items():
+            dept_code = department_codes[dept]
             for semester in semesters:
                 for division in ['A', 'B', 'C']:
-                    class_name = f"S{semester}-{division}"
+                    class_name = f"{dept_code}-S{semester}-{division}"
                     existing = Class.query.filter_by(class_name=class_name).first()
                     if not existing:
                         cls = Class(
@@ -73,7 +79,7 @@ def init_timetable_data():
         print(f"   ✓ {len(timeslots)} TimeSlots (5 days × 6 hours)")
         print(f"   ✓ {class_count} Classes (3 depts × 4 sems × 3 divs)")
         print("\nTimeSlots: Monday-Friday, Hours 1-6")
-        print("Classes: S1-A/B/C, S3-A/B/C, S5-A/B/C, S7-A/B/C")
+        print("Classes: CSE-S1-A/B/C, ECE-S1-A/B/C, ME-S1-A/B/C, etc.")
         print("Departments: Computer Science, Electronics, Mechanical")
         print("=" * 60)
 

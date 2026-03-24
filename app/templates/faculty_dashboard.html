@@ -96,6 +96,13 @@
                 {% endif %}
             </select>
         </div>
+        <div class="col-md-4">
+            <label for="referenceDate" class="form-label"><strong>🗓️ Reference Date:</strong></label>
+            <input type="date" class="form-control" id="referenceDate" name="reference_date" value="{{ reference_date.strftime('%Y-%m-%d') }}">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Apply</button>
+        </div>
     </form>
 </div>
 
@@ -106,6 +113,7 @@
         ({{ selected_year }})
         {% endif %}
     </h4>
+    <p class="text-muted mb-3">Duty values are calculated for {{ reference_date.strftime('%d %b %Y') }}.</p>
     
     <div class="workload-grid">
         <div class="workload-item">
@@ -178,6 +186,7 @@
                 <tr>
                     <th>📖 Course Code</th>
                     <th>📝 Subject Name</th>
+                    <th>🏫 Class</th>
                     <th>🏷️ Type</th>
                     <th>⏱️ Hours/Week</th>
                     <th>🎓 Semester</th>
@@ -188,6 +197,7 @@
                 <tr>
                     <td><strong>{{ assignment.subject.course_code }}</strong></td>
                     <td>{{ assignment.subject.subject_name }}</td>
+                    <td><span class="badge bg-warning text-dark">{{ assignment.class_name }}</span></td>
                     <td><span class="badge bg-secondary">{{ assignment.subject.subject_type }}</span></td>
                     <td><span class="badge bg-info">{{ assignment.subject.hours_per_week }}</span></td>
                     <td>
@@ -221,6 +231,7 @@
                     <th>📋 Duty Name</th>
                     <th>🏷️ Category</th>
                     <th>⏱️ Hours/Week</th>
+                    <th>🗓️ Duty Day</th>
                     <th>📅 Academic Year</th>
                 </tr>
             </thead>
@@ -230,6 +241,7 @@
                     <td><strong>{{ duty.duty_name }}</strong></td>
                     <td><span class="badge bg-secondary">{{ duty.category }}</span></td>
                     <td><span class="badge bg-info">{{ duty.hours }}</span></td>
+                    <td><span class="badge bg-warning text-dark">{{ duty.duty_day or '-' }}</span></td>
                     <td><span class="badge bg-primary">{{ duty.academic_year }}</span></td>
                 </tr>
                 {% endfor %}

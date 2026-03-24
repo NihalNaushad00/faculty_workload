@@ -181,6 +181,19 @@
 </div>
 
 {% if current_user.role == "admin" %}
+<div class="workload-card">
+    <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label for="referenceDate" class="form-label"><strong>🗓️ Reference Date</strong></label>
+            <input type="date" class="form-control" id="referenceDate" name="reference_date" value="{{ reference_date.strftime('%Y-%m-%d') }}">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Apply</button>
+        </div>
+    </form>
+    <p style="color: #666; margin: 12px 0 0 0;">Workload and overload counts are calculated for {{ reference_date.strftime('%d %b %Y') }}.</p>
+</div>
+
 <!-- Statistics Cards -->
 <div class="row">
     <div class="col-md-6 col-lg-3">
@@ -283,6 +296,7 @@
                 <tr>
                     <th>Course Code</th>
                     <th>Subject Name</th>
+                    <th>Class</th>
                     <th>Type</th>
                     <th>Academic Year</th>
                     <th>Hours/Week</th>
@@ -296,6 +310,7 @@
                 <tr>
                     <td><strong>{{ assignment.subject.course_code }}</strong></td>
                     <td>{{ assignment.subject.subject_name }}</td>
+                    <td><span class="badge bg-warning text-dark">{{ assignment.class_name }}</span></td>
                     <td><span class="badge bg-secondary">{{ assignment.subject.subject_type }}</span></td>
                     <td><span class="badge bg-primary">{{ assignment.academic_year }}</span></td>
                     <td><span class="badge bg-info">{{ assignment.subject.hours_per_week }} hrs</span></td>

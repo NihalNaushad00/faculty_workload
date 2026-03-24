@@ -17,6 +17,19 @@
     </div>
 </div>
 
+<div class="duty-card mb-4">
+    <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label for="referenceDate" class="form-label"><strong>🗓️ Reference Date</strong></label>
+            <input type="date" class="form-control" id="referenceDate" name="reference_date" value="{{ reference_date.strftime('%Y-%m-%d') }}">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Apply</button>
+        </div>
+    </form>
+    <small class="text-muted d-block mt-2">Duty status is calculated for {{ reference_date.strftime('%d %b %Y') }}.</small>
+</div>
+
 <div class="duty-card">
     <div class="table-responsive">
         <table class="table table-striped table-hover">
@@ -26,6 +39,7 @@
                     <th>📋 Duty Name</th>
                     <th>🏷️ Category</th>
                     <th>⏰ Duration Type</th>
+                    <th>🗓️ Duty Day</th>
                     <th>📅 Start Date</th>
                     <th>📅 End Date</th>
                     <th>⏱️ Hours/Week</th>
@@ -51,6 +65,9 @@
                     </td>
                     <td>
                         <span class="badge bg-info">{{ item.duration_type }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-warning text-dark">{{ item.duty_day or '-' }}</span>
                     </td>
                     <td>
                         <small>{{ item.start_date }}</small>

@@ -5,7 +5,7 @@ Adds sample faculty, subjects, and duties for testing
 """
 
 from app import create_app, db
-from app.models import Faculty, Subject, Assignment, AdditionalDuty
+from app.models import Faculty, Subject, Assignment, AdditionalDuty, Class
 from datetime import datetime, timedelta
 
 app = create_app()
@@ -169,6 +169,25 @@ def seed_database():
             print(f"   ✓ {subject.course_code} - {subject.subject_name}")
         
         db.session.commit()
+
+        # Create Classes
+        print("\n🏫 Creating Classes...")
+        classes = [
+            Class(class_name='CSE-S1-A', semester=1, department='Computer Science'),
+            Class(class_name='CSE-S1-B', semester=1, department='Computer Science'),
+            Class(class_name='CSE-S3-B', semester=3, department='Computer Science'),
+            Class(class_name='CSE-S5-A', semester=5, department='Computer Science'),
+            Class(class_name='ECE-S1-A', semester=1, department='Electronics'),
+            Class(class_name='ECE-S3-B', semester=3, department='Electronics'),
+        ]
+
+        for class_obj in classes:
+            db.session.add(class_obj)
+            print(f"   ✓ {class_obj.class_name} ({class_obj.department})")
+
+        db.session.commit()
+
+        class_map = {class_obj.class_name: class_obj for class_obj in classes}
         
         # Create Assignments
         print("\n🔗 Creating Assignments (Faculty -> Subjects)...")
@@ -177,14 +196,24 @@ def seed_database():
             Assignment(
                 faculty_id=faculties[0].id,
                 subject_id=subjects[0].id,
-                class_division='A',
+                class_id=class_map['CSE-S1-A'].id,
+                class_division=class_map['CSE-S1-A'].class_name,
                 semester=1,
                 academic_year='2025-26'
             ),
             Assignment(
                 faculty_id=faculties[0].id,
                 subject_id=subjects[1].id,
-                class_division='A',
+                class_id=class_map['CSE-S1-A'].id,
+                class_division=class_map['CSE-S1-A'].class_name,
+                semester=1,
+                academic_year='2025-26'
+            ),
+            Assignment(
+                faculty_id=faculties[0].id,
+                subject_id=subjects[1].id,
+                class_id=class_map['CSE-S1-B'].id,
+                class_division=class_map['CSE-S1-B'].class_name,
                 semester=1,
                 academic_year='2025-26'
             ),
@@ -192,14 +221,16 @@ def seed_database():
             Assignment(
                 faculty_id=faculties[1].id,
                 subject_id=subjects[2].id,
-                class_division='B',
+                class_id=class_map['CSE-S3-B'].id,
+                class_division=class_map['CSE-S3-B'].class_name,
                 semester=3,
                 academic_year='2025-26'
             ),
             Assignment(
                 faculty_id=faculties[1].id,
                 subject_id=subjects[3].id,
-                class_division='B',
+                class_id=class_map['CSE-S3-B'].id,
+                class_division=class_map['CSE-S3-B'].class_name,
                 semester=3,
                 academic_year='2025-26'
             ),
@@ -207,7 +238,8 @@ def seed_database():
             Assignment(
                 faculty_id=faculties[3].id,
                 subject_id=subjects[4].id,
-                class_division='A',
+                class_id=class_map['CSE-S5-A'].id,
+                class_division=class_map['CSE-S5-A'].class_name,
                 semester=5,
                 academic_year='2025-26'
             ),
@@ -215,14 +247,16 @@ def seed_database():
             Assignment(
                 faculty_id=faculties[2].id,
                 subject_id=subjects[6].id,
-                class_division='A',
+                class_id=class_map['ECE-S1-A'].id,
+                class_division=class_map['ECE-S1-A'].class_name,
                 semester=1,
                 academic_year='2025-26'
             ),
             Assignment(
                 faculty_id=faculties[2].id,
                 subject_id=subjects[7].id,
-                class_division='A',
+                class_id=class_map['ECE-S1-A'].id,
+                class_division=class_map['ECE-S1-A'].class_name,
                 semester=1,
                 academic_year='2025-26'
             ),
@@ -230,7 +264,8 @@ def seed_database():
             Assignment(
                 faculty_id=faculties[4].id,
                 subject_id=subjects[8].id,
-                class_division='B',
+                class_id=class_map['ECE-S3-B'].id,
+                class_division=class_map['ECE-S3-B'].class_name,
                 semester=3,
                 academic_year='2025-26'
             ),
@@ -257,6 +292,7 @@ def seed_database():
                 category='Leadership',
                 duration_type='Yearly',
                 hours=5,
+                duty_day='Monday',
                 start_date=academic_year_start,
                 end_date=academic_year_end,
                 academic_year='2025-26'
@@ -267,6 +303,7 @@ def seed_database():
                 category='Leadership',
                 duration_type='Yearly',
                 hours=4,
+                duty_day='Wednesday',
                 start_date=academic_year_start,
                 end_date=academic_year_end,
                 academic_year='2025-26'
@@ -278,6 +315,7 @@ def seed_database():
                 category='Exam',
                 duration_type='Weekly',
                 hours=3,
+                duty_day=today.strftime('%A'),
                 start_date=today,
                 end_date=today + timedelta(days=6),
                 academic_year='2025-26'
@@ -288,6 +326,7 @@ def seed_database():
                 category='Exam',
                 duration_type='Weekly',
                 hours=2,
+                duty_day=today.strftime('%A'),
                 start_date=today,
                 end_date=today + timedelta(days=6),
                 academic_year='2025-26'
@@ -299,6 +338,7 @@ def seed_database():
                 category='Administrative',
                 duration_type='Custom',
                 hours=2,
+                duty_day='Thursday',
                 start_date=datetime(2026, 3, 1).date(),
                 end_date=datetime(2026, 3, 31).date(),
                 academic_year='2025-26'
