@@ -5,6 +5,8 @@ Utility functions for Faculty Workload Management System
 from app import db
 from app.models import TimeSlot, Class, Timetable, Assignment
 
+MAX_DAILY_HOURS = 4
+
 
 def create_timeslots():
     """Create all timeslots if they don't exist"""
@@ -41,7 +43,20 @@ def assignment_matches_class(assignment, class_obj):
     return class_name.endswith(f"-{assignment_division}")
 
 
-def get_available_slots(class_id, faculty_id, academic_year, day=None):
+def get_daily_scheduled_hours(academic_year, day, class_id=None, faculty_id=None):
+    """Get the number of periods already scheduled for a class or faculty on a day."""
+    query = Timetable.query.filter_by(academic_year=academic_year)
+
+    if class_id is not None:
+        query = query.filter_by(class_id=class_id)
+
+    if faculty_id is not None:
+        query = query.filter_by(faculty_id=faculty_id)
+
+    return sum(1 for timetable in query.all() if timetable.timeslot.day == day)
+
+
+def get_available_slots(class_id, faculty_id, academic_year, day=None, max_daily_hours=MAX_DAILY_HOURS):
     """
     Get available timeslots for a class and faculty combination
     Optionally filter by specific day
@@ -55,6 +70,20 @@ def get_available_slots(class_id, faculty_id, academic_year, day=None):
     available = []
     
     for slot in all_slots:
+        class_daily_hours = get_daily_scheduled_hours(
+            academic_year,
+            slot.day,
+            class_id=class_id
+        )
+        faculty_daily_hours = get_daily_scheduled_hours(
+            academic_year,
+            slot.day,
+            faculty_id=faculty_id
+        )
+
+        if class_daily_hours >= max_daily_hours or faculty_daily_hours >= max_daily_hours:
+            continue
+
         # Check if class already has a subject at this time
         class_conflict = Timetable.query.filter_by(
             class_id=class_id,
@@ -77,20 +106,23 @@ def get_available_slots(class_id, faculty_id, academic_year, day=None):
 
 def get_faculty_workload_today(faculty_id, academic_year, day):
     """Get current hours scheduled for a faculty on a specific day"""
-    timetables = Timetable.query.filter_by(
-        faculty_id=faculty_id,
-        academic_year=academic_year
-    ).all()
-    hours = 0
-    
-    for tt in timetables:
-        if tt.timeslot.day == day:
-            hours += 1
-    
-    return hours
+    return get_daily_scheduled_hours(
+        academic_year,
+        day,
+        faculty_id=faculty_id
+    )
 
 
-def find_continuous_slots(class_id, faculty_id, academic_year, duration, day=None):
+def get_class_workload_today(class_id, academic_year, day):
+    """Get current hours scheduled for a class on a specific day."""
+    return get_daily_scheduled_hours(
+        academic_year,
+        day,
+        class_id=class_id
+    )
+
+
+def find_continuous_slots(class_id, faculty_id, academic_year, duration, day=None, max_daily_hours=MAX_DAILY_HOURS):
     """
     Find continuous available slots for lab subjects
     duration: number of continuous hours needed (e.g., 3 for labs)
@@ -100,7 +132,22 @@ def find_continuous_slots(class_id, faculty_id, academic_year, duration, day=Non
         days = [day]
     
     for target_day in days:
-        available = get_available_slots(class_id, faculty_id, academic_year, target_day)
+        class_daily_hours = get_class_workload_today(class_id, academic_year, target_day)
+        faculty_daily_hours = get_faculty_workload_today(faculty_id, academic_year, target_day)
+
+        if class_daily_hours + duration > max_daily_hours:
+            continue
+
+        if faculty_daily_hours + duration > max_daily_hours:
+            continue
+
+        available = get_available_slots(
+            class_id,
+            faculty_id,
+            academic_year,
+            target_day,
+            max_daily_hours=max_daily_hours
+        )
         available.sort(key=lambda x: x.hour)
         
         # Try to find continuous slots
@@ -165,7 +212,7 @@ def generate_timetable(semester, academic_year):
     3. For each class, get assignments
     4. Schedule lab subjects first (need continuous 3 hours)
     5. Schedule theory subjects (distribute across week)
-    6. Check constraints: faculty availability and workload
+    6. Check constraints: faculty availability, workload, and max 4 periods/day
     
     Args:
         semester (int): Semester number (1-8)
@@ -240,7 +287,8 @@ def generate_timetable(semester, academic_year):
                         faculty.id,
                         academic_year,
                         required_duration,
-                        attempt_day
+                        attempt_day,
+                        max_daily_hours=MAX_DAILY_HOURS
                     )
                     
                     if continuous_slots and len(continuous_slots) == required_duration:
@@ -291,7 +339,8 @@ def generate_timetable(semester, academic_year):
                         class_obj.id,
                         faculty.id,
                         academic_year,
-                        current_day
+                        current_day,
+                        max_daily_hours=MAX_DAILY_HOURS
                     )
                     
                     if available:
