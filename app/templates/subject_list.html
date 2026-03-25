@@ -59,7 +59,6 @@
                         <span class="badge bg-warning">{{ item.assignment_count }}</span>
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-primary" disabled title="Coming Soon">✏️ Edit</button>
                         <form method="POST" action="{{ url_for('main.delete_subject', id=item.subject.id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this subject? This will also delete all related assignments.');">
                             <button type="submit" class="btn btn-sm btn-danger">🗑️ Delete</button>
                         </form>

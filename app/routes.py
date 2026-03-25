@@ -676,8 +676,22 @@ def delete_subject(id):
         return "Access Denied: Admins Only"
     
     subject = Subject.query.get_or_404(id)
+    affected_periods = {
+        (assignment.semester, assignment.academic_year)
+        for assignment in subject.assignments
+        if assignment.academic_year
+    }
+
+    timetable_rows = Timetable.query.filter_by(subject_id=subject.id).all()
+    for row in timetable_rows:
+        affected_periods.add((row.semester, row.academic_year))
+        db.session.delete(row)
+
     db.session.delete(subject)
     db.session.commit()
+
+    for semester, academic_year in affected_periods:
+        generate_timetable(semester, academic_year)
     
     return redirect(url_for('main.subject_list'))
 
